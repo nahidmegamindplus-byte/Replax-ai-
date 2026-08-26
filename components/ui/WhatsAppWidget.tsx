@@ -10,7 +10,12 @@ interface WhatsAppSettings {
 }
 
 export default function WhatsAppWidget() {
-  const [settings, setSettings] = useState<WhatsAppSettings | null>(null);
+  const [settings, setSettings] = useState<WhatsAppSettings>({
+    enabled: true,
+    number: '+8801700000000',
+    message: 'আসসালামু আলাইকুম, আমি ReplyX AI সম্পর্কে তথ্য জানতে চাই।',
+    position: 'RIGHT',
+  });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -24,14 +29,14 @@ export default function WhatsAppWidget() {
           setSettings(data.settings);
         }
       } catch (e) {
-        // Silent fail
+        // Use default enabled fallback
       }
     }
 
     loadSettings();
   }, []);
 
-  if (!mounted || !settings || !settings.enabled || !settings.number) {
+  if (!mounted || !settings || settings.enabled === false || !settings.number) {
     return null;
   }
 

@@ -21,10 +21,13 @@ export async function GET(req: NextRequest) {
       settingsMap[s.key] = s.value;
     });
 
+    const isExplicitlyDisabled = settingsMap['whatsapp_enabled'] === 'false';
+    const isEnabled = !isExplicitlyDisabled;
+
     return NextResponse.json({
       success: true,
       settings: {
-        enabled: settingsMap['whatsapp_enabled'] === 'true',
+        enabled: isEnabled,
         number: settingsMap['whatsapp_number'] || '+8801700000000',
         message:
           settingsMap['whatsapp_message'] ||
@@ -35,11 +38,11 @@ export async function GET(req: NextRequest) {
   } catch (error: any) {
     return NextResponse.json(
       {
-        success: false,
+        success: true,
         settings: {
-          enabled: false,
+          enabled: true,
           number: '+8801700000000',
-          message: 'আসসালামু আলাইকুম',
+          message: 'আসসালামু আলাইকুম, আমি ReplyX AI সম্পর্কে তথ্য জানতে চাই।',
           position: 'RIGHT',
         },
       },

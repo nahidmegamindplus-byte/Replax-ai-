@@ -26,10 +26,13 @@ export async function GET(req: NextRequest) {
       settingsMap[s.key] = s.value;
     });
 
+    const isExplicitlyDisabled = settingsMap['whatsapp_enabled'] === 'false';
+    const isEnabled = !isExplicitlyDisabled;
+
     return NextResponse.json({
       success: true,
       settings: {
-        enabled: settingsMap['whatsapp_enabled'] === 'true',
+        enabled: isEnabled,
         number: settingsMap['whatsapp_number'] || '+8801700000000',
         message:
           settingsMap['whatsapp_message'] ||
