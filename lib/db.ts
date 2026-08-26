@@ -5,14 +5,20 @@ import path from 'path';
 function getDatabaseUrl(): string {
   const envUrl = process.env.DATABASE_URL;
 
-  // Detect serverless or production environment
-  const isServerless =
+  // On Render / Docker / Serverless environments
+  const isServerlessOrDocker =
+    process.env.RENDER ||
     process.env.NETLIFY ||
     process.env.VERCEL ||
     process.env.AWS_LAMBDA_FUNCTION_NAME ||
     process.env.NODE_ENV === 'production';
 
-  if (isServerless) {
+  // If explicit non-relative DATABASE_URL is set in Render settings (e.g. Postgres or /var/data/dev.db)
+  if (envUrl && !envUrl.startsWith('file:.')) {
+    return envUrl;
+  }
+
+  if (isServerlessOrDocker) {
     const tmpDir = '/tmp';
     if (fs.existsSync(tmpDir)) {
       const targetDbPath = path.join(tmpDir, 'replyx_dev.db');
