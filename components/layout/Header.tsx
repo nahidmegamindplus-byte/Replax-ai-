@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Menu, Bell, Sparkles, Activity } from 'lucide-react';
+import { Menu, Bell, Sparkles } from 'lucide-react';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 interface HeaderProps {
   title: string;
@@ -34,6 +35,9 @@ export default function Header({ title, subtitle, onOpenMobile }: HeaderProps) {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Dark / Light Mode Toggle Button */}
+          <ThemeToggle />
+
           <button
             className="p-2 rounded-xl bg-[#121624] border border-[#1e2538] text-gray-400 hover:text-white transition-colors relative"
             title="নোটিফিকেশন"

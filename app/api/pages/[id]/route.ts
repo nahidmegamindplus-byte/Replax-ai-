@@ -83,6 +83,7 @@ export async function PUT(
     const updateData: any = {};
 
     if (body.pageName !== undefined) updateData.pageName = body.pageName.trim();
+    if (body.facebookPageId !== undefined && body.facebookPageId.trim().length > 0) updateData.facebookPageId = body.facebookPageId.trim();
     if (body.autoReplyEnabled !== undefined) updateData.autoReplyEnabled = Boolean(body.autoReplyEnabled);
     if (body.humanHandoffEnabled !== undefined) updateData.humanHandoffEnabled = Boolean(body.humanHandoffEnabled);
     if (body.replyLanguage !== undefined) updateData.replyLanguage = body.replyLanguage;

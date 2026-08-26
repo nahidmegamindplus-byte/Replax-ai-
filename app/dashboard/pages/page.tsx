@@ -16,6 +16,14 @@ import {
   ShieldCheck,
   AlertTriangle,
   X,
+  Edit3,
+  Globe,
+  Sliders,
+  MessageSquare,
+  Bot,
+  Camera,
+  Mic,
+  ShoppingBag,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -128,16 +136,17 @@ export default function PagesManagementPage() {
   const openEditModal = (page: any) => {
     setSelectedPage(page);
     setEditForm({
-      pageName: page.pageName,
+      pageName: page.pageName || '',
+      facebookPageId: page.facebookPageId || '',
       pageAccessToken: '',
-      autoReplyEnabled: page.autoReplyEnabled,
-      humanHandoffEnabled: page.humanHandoffEnabled,
-      replyLanguage: page.replyLanguage,
-      replyStyle: page.replyStyle,
-      productImageReply: page.productImageReply,
-      orderDetection: page.orderDetection,
-      voiceProcessing: page.voiceProcessing,
-      imageUnderstanding: page.imageUnderstanding,
+      autoReplyEnabled: page.autoReplyEnabled ?? true,
+      humanHandoffEnabled: page.humanHandoffEnabled ?? true,
+      replyLanguage: page.replyLanguage || 'AUTO',
+      replyStyle: page.replyStyle || 'FRIENDLY',
+      productImageReply: page.productImageReply ?? true,
+      orderDetection: page.orderDetection ?? true,
+      voiceProcessing: page.voiceProcessing ?? true,
+      imageUnderstanding: page.imageUnderstanding ?? true,
       aiInstructions: page.aiInstructions || '',
     });
     setShowEditModal(true);
@@ -162,7 +171,7 @@ export default function PagesManagementPage() {
         return;
       }
 
-      toast.success('পেজ সেটিংস সফলভাবে আপডেট হয়েছে!');
+      toast.success('পেজের সমস্ত সেকশন ও সেটিংস সফলভাবে আপডেট হয়েছে!');
       setShowEditModal(false);
       fetchPages();
     } catch (e) {
@@ -192,13 +201,13 @@ export default function PagesManagementPage() {
   return (
     <DashboardLayout
       title="Facebook Page সমূহ"
-      subtitle="আপনার সংযুক্ত ফেসবুক পেজ ম্যানেজ করুন, ওয়েবহুক কনফিগার করুন এবং সংযোগ পরীক্ষা করুন"
+      subtitle="সংযুক্ত ফেসবুক পেজের সেটিংস পরিবর্তন করুন, ফিচারগুলো এডিট ও আপডেট করুন"
     >
       {/* Action Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
         <div>
           <h2 className="text-lg font-bold text-white">সংযুক্ত পেজ তালিকা</h2>
-          <p className="text-xs text-gray-400">প্রতিটি পেজের নিজস্ব AI নির্দেশিকা ও ওয়েবহুক রয়েছে</p>
+          <p className="text-xs text-gray-400">যেকোনো সময় সংযোগ, ভাষা, টোন ও এআই নিয়মাবলী এডিট করতে পারবেন</p>
         </div>
 
         <button
@@ -313,7 +322,7 @@ export default function PagesManagementPage() {
                     <span className="text-gray-200 font-semibold">{page.replyLanguage}</span>
                   </div>
                   <div className="flex items-center justify-between bg-[#141824] px-3 py-1.5 rounded-lg">
-                    <span>প্রোডাক্ট ছবি পাঠানো:</span>
+                    <span>প্রোডাক্ট ছবি:</span>
                     <span className={page.productImageReply ? 'text-cyan-400 font-semibold' : 'text-gray-500'}>
                       {page.productImageReply ? 'চালু' : 'বন্ধ'}
                     </span>
@@ -340,10 +349,11 @@ export default function PagesManagementPage() {
 
                 <button
                   onClick={() => openEditModal(page)}
-                  className="p-2 rounded-xl bg-[#1a1f2e] hover:bg-[#252c40] text-gray-300 hover:text-white transition-colors"
-                  title="সেটিংস পরিবর্তন"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#1a1f2e] hover:bg-[#252c40] text-emerald-400 hover:text-emerald-300 font-semibold text-xs transition-colors border border-emerald-500/20"
+                  title="সেটিংস এডিট ও আপডেট করুন"
                 >
-                  <Settings className="w-4 h-4" />
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>এডিট</span>
                 </button>
 
                 <button
@@ -371,7 +381,7 @@ export default function PagesManagementPage() {
             </button>
 
             <h3 className="text-lg font-bold text-white mb-1">নতুন Facebook Page সংযুক্ত করুন</h3>
-            <p className="text-xs text-gray-400 mb-6">Facebook Developer Portal থেকে Page ID ও Page Access Token সংগ্রহ করুন</p>
+            <p className="text-xs text-gray-400 mb-6">পরবর্তীতে যেকোনো সময় এই সেকশনের সমস্ত তথ্য এডিট ও আপডেট করতে পারবেন</p>
 
             <form onSubmit={handleAddPage} className="space-y-4">
               <div>
@@ -475,7 +485,7 @@ export default function PagesManagementPage() {
       {/* Edit Page Settings Modal */}
       {showEditModal && selectedPage && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
-          <div className="bg-[#12141c] border border-[#1f2433] rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative my-8">
+          <div className="bg-[#12141c] border border-[#1f2433] rounded-3xl max-w-xl w-full p-6 sm:p-8 shadow-2xl relative my-8">
             <button
               onClick={() => setShowEditModal(false)}
               className="absolute top-5 right-5 text-gray-400 hover:text-white p-1 rounded-lg"
@@ -483,26 +493,108 @@ export default function PagesManagementPage() {
               <X className="w-5 h-5" />
             </button>
 
-            <h3 className="text-lg font-bold text-white mb-1">পেজ সেটিংস ও AI রুলস</h3>
-            <p className="text-xs text-gray-400 mb-6">{selectedPage.pageName} (ID: {selectedPage.facebookPageId})</p>
+            <h3 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
+              <Sliders className="w-5 h-5 text-emerald-400" />
+              <span>পেজের সেকশন ও সেটিংস আপডেট এডিটর</span>
+            </h3>
+            <p className="text-xs text-gray-400 mb-6">
+              {selectedPage.pageName} (ID: {selectedPage.facebookPageId})
+            </p>
 
-            <form onSubmit={handleUpdatePage} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-                  পেজের নাম
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editForm.pageName}
-                  onChange={(e) => setEditForm({ ...editForm, pageName: e.target.value })}
-                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"
-                />
+            <form onSubmit={handleUpdatePage} className="space-y-5 max-h-[75vh] overflow-y-auto pr-1">
+              {/* Section 1: Connection Info */}
+              <div className="space-y-3 p-4 rounded-2xl bg-[#0a0c13] border border-[#1e2538]">
+                <h4 className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">
+                  ১. মূল সংযোগ তথ্য (Basic Info)
+                </h4>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    পেজের নাম (Page Name)
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.pageName}
+                    onChange={(e) => setEditForm({ ...editForm, pageName: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#121624] border border-[#1e2538] rounded-xl text-white text-sm focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    Facebook Page ID
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editForm.facebookPageId}
+                    onChange={(e) => setEditForm({ ...editForm, facebookPageId: e.target.value })}
+                    className="w-full px-3.5 py-2 bg-[#121624] border border-[#1e2538] rounded-xl text-white text-sm font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">
+                    Page Access Token আপডেট (ঐচ্ছিক)
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.pageAccessToken}
+                    onChange={(e) => setEditForm({ ...editForm, pageAccessToken: e.target.value })}
+                    placeholder="টোকেন পরিবর্তন করতে চাইলে নতুন টোকেন দিন (EAAB...)"
+                    className="w-full px-3.5 py-2 bg-[#121624] border border-[#1e2538] rounded-xl text-white placeholder-gray-500 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
               </div>
 
-              {/* Toggles */}
-              <div className="space-y-3 p-4 rounded-xl bg-[#0a0c13] border border-[#1e2538]">
-                <label className="flex items-center justify-between text-xs cursor-pointer">
+              {/* Section 2: Reply Style & Language */}
+              <div className="space-y-3 p-4 rounded-2xl bg-[#0a0c13] border border-[#1e2538]">
+                <h4 className="text-xs font-bold text-cyan-400 uppercase tracking-wider mb-2">
+                  ২. ভাষা ও বাচনভঙ্গি সেটিংস (Language & Tone)
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      রিপ্লাই ভাষা
+                    </label>
+                    <select
+                      value={editForm.replyLanguage}
+                      onChange={(e) => setEditForm({ ...editForm, replyLanguage: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#121624] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="AUTO">অটো ডিটেক্ট (Auto Detect)</option>
+                      <option value="BANGLA">বাংলা (Bangla)</option>
+                      <option value="ENGLISH">English</option>
+                      <option value="BANGLISH">ব্যাংলিশ (Banglish)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-300 mb-1">
+                      বাচনভঙ্গি / টোন
+                    </label>
+                    <select
+                      value={editForm.replyStyle}
+                      onChange={(e) => setEditForm({ ...editForm, replyStyle: e.target.value })}
+                      className="w-full px-3 py-2 bg-[#121624] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                    >
+                      <option value="FRIENDLY">আন্তরিক (Friendly)</option>
+                      <option value="PROFESSIONAL">পেশাদার (Professional)</option>
+                      <option value="SALES_FOCUSED">সেলস ফোকাসড (Sales)</option>
+                      <option value="SHORT">সংক্ষিপ্ত (Short)</option>
+                      <option value="CASUAL">ক্যাজুয়াল (Casual)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 3: Feature Toggles */}
+              <div className="space-y-3 p-4 rounded-2xl bg-[#0a0c13] border border-[#1e2538]">
+                <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">
+                  ৩. এআই ফিচার কন্ট্রোল (Feature Toggles)
+                </h4>
+
+                <label className="flex items-center justify-between text-xs cursor-pointer p-2 rounded-lg bg-[#121624]">
                   <span className="text-gray-200 font-medium">স্বয়ংক্রিয় রিপ্লাই (Auto Reply)</span>
                   <input
                     type="checkbox"
@@ -512,7 +604,7 @@ export default function PagesManagementPage() {
                   />
                 </label>
 
-                <label className="flex items-center justify-between text-xs cursor-pointer">
+                <label className="flex items-center justify-between text-xs cursor-pointer p-2 rounded-lg bg-[#121624]">
                   <span className="text-gray-200 font-medium">হিউম্যান হ্যান্ডঅফ টেকওভার সাপোর্ট</span>
                   <input
                     type="checkbox"
@@ -522,7 +614,7 @@ export default function PagesManagementPage() {
                   />
                 </label>
 
-                <label className="flex items-center justify-between text-xs cursor-pointer">
+                <label className="flex items-center justify-between text-xs cursor-pointer p-2 rounded-lg bg-[#121624]">
                   <span className="text-gray-200 font-medium">প্রোডাক্টের ছবি পাঠানো (Product Image Reply)</span>
                   <input
                     type="checkbox"
@@ -532,7 +624,7 @@ export default function PagesManagementPage() {
                   />
                 </label>
 
-                <label className="flex items-center justify-between text-xs cursor-pointer">
+                <label className="flex items-center justify-between text-xs cursor-pointer p-2 rounded-lg bg-[#121624]">
                   <span className="text-gray-200 font-medium">স্বয়ংক্রিয় অর্ডার ক্যাপচার (Order Intent Detection)</span>
                   <input
                     type="checkbox"
@@ -541,31 +633,39 @@ export default function PagesManagementPage() {
                     className="w-4 h-4 accent-emerald-500 rounded"
                   />
                 </label>
+
+                <label className="flex items-center justify-between text-xs cursor-pointer p-2 rounded-lg bg-[#121624]">
+                  <span className="text-gray-200 font-medium">ভয়েস/অডিও মেসেজ প্রসেসিং (Voice AI)</span>
+                  <input
+                    type="checkbox"
+                    checked={editForm.voiceProcessing}
+                    onChange={(e) => setEditForm({ ...editForm, voiceProcessing: e.target.checked })}
+                    className="w-4 h-4 accent-emerald-500 rounded"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between text-xs cursor-pointer p-2 rounded-lg bg-[#121624]">
+                  <span className="text-gray-200 font-medium">ছবি চেনা ও ভিশন বিশ্লেষণ (Vision AI)</span>
+                  <input
+                    type="checkbox"
+                    checked={editForm.imageUnderstanding}
+                    onChange={(e) => setEditForm({ ...editForm, imageUnderstanding: e.target.checked })}
+                    className="w-4 h-4 accent-emerald-500 rounded"
+                  />
+                </label>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-                  পেজ-নির্দিষ্ট AI নির্দেশিকা (Custom AI Instructions)
-                </label>
+              {/* Section 4: AI Instructions */}
+              <div className="space-y-2 p-4 rounded-2xl bg-[#0a0c13] border border-[#1e2538]">
+                <h4 className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">
+                  ৪. কাস্টম পেজ নির্দেশিকা (Custom AI Rules)
+                </h4>
                 <textarea
                   rows={4}
                   value={editForm.aiInstructions}
                   onChange={(e) => setEditForm({ ...editForm, aiInstructions: e.target.value })}
-                  placeholder="গ্রাহকের সাথে কথা বলার বিশেষ নিয়মাবলী লিখুন..."
-                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-                  Page Access Token আপডেট (ঐচ্ছিক)
-                </label>
-                <input
-                  type="text"
-                  value={editForm.pageAccessToken}
-                  onChange={(e) => setEditForm({ ...editForm, pageAccessToken: e.target.value })}
-                  placeholder="টোকেন মেয়াদোত্তীর্ণ হলে নতুন টোকেন দিন"
-                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white placeholder-gray-500 text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  placeholder="আপনার পেজের জন্য বিশেষ নির্দেশাবলী, ডেলিভারি রুলস বা অফার টেক্সট লিখুন..."
+                  className="w-full px-3.5 py-2 bg-[#121624] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
@@ -580,9 +680,9 @@ export default function PagesManagementPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                  className="px-6 py-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-black font-bold text-xs shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                 >
-                  {saving ? 'সংরক্ষণ হচ্ছে...' : 'আপডেট করুন'}
+                  {saving ? 'সংরক্ষণ হচ্ছে...' : 'সেটিংস আপডেট করুন'}
                 </button>
               </div>
             </form>
