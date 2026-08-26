@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { ToastProvider } from '@/components/ui/Toast';
 import { ThemeProvider } from '@/components/ui/ThemeProvider';
+import { LanguageProvider } from '@/components/language/LanguageProvider';
 
 export const metadata: Metadata = {
   title: 'ReplyX AI — AI-Powered Facebook Messenger Automation',
@@ -23,7 +24,9 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider>
-          <ToastProvider>{children}</ToastProvider>
+          <LanguageProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </LanguageProvider>
         </ThemeProvider>
       </body>
     </html>
