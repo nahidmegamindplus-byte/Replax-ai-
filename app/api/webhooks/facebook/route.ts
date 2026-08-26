@@ -1,0 +1,311 @@
+import { NextRequest, NextResponse } from 'next/server';
+import prisma from '@/lib/db';
+import { decrypt } from '@/lib/crypto';
+import {
+  verifyFacebookSignature,
+  sendMessengerAction,
+  sendMessengerText,
+  sendMessengerImage,
+} from '@/lib/facebook';
+import { generateAIReply } from '@/lib/ai';
+import { serverLogger, logActivity } from '@/lib/logger';
+
+// In-memory cache for webhook message deduplication / idempotency (stores message IDs for 10 mins)
+const processedMessageIds = new Set<string>();
+
+/**
+ * Facebook Webhook Verification Endpoint (GET)
+ */
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const mode = searchParams.get('hub.mode');
+    const token = searchParams.get('hub.verify_token');
+    const challenge = searchParams.get('hub.challenge');
+
+    serverLogger.info('Facebook Webhook verification request received', { mode, token });
+
+    if (mode === 'subscribe' && token && challenge) {
+      // Find page with matching verify token
+      const pages = await prisma.page.findMany({
+        select: { id: true, pageName: true, verifyTokenEncrypted: true },
+      });
+
+      const globalVerifyToken = process.env.FACEBOOK_WEBHOOK_VERIFY_TOKEN;
+      const isGlobalMatch = Boolean(globalVerifyToken && globalVerifyToken.trim() === token.trim());
+      const matchedPage = pages.find((p) => decrypt(p.verifyTokenEncrypted) === token) || (isGlobalMatch && pages.length > 0 ? pages[0] : null);
+
+      if (matchedPage || isGlobalMatch) {
+        // Update page webhook status to ACTIVE if a specific page was matched
+        if (matchedPage) {
+          await prisma.page.update({
+            where: { id: matchedPage.id },
+            data: { webhookStatus: 'ACTIVE' },
+          });
+          serverLogger.info(`Webhook verified successfully for page: ${matchedPage.pageName}`);
+        } else {
+          serverLogger.info(`Webhook verified successfully via global FACEBOOK_WEBHOOK_VERIFY_TOKEN`);
+        }
+
+        return new NextResponse(challenge, {
+          status: 200,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+      } else {
+        serverLogger.warn('Webhook verification token did not match any connected page or global token', { token });
+        return new NextResponse('Verification token mismatch', { status: 403 });
+      }
+    }
+
+    return new NextResponse('Invalid verification request parameters', { status: 400 });
+  } catch (error: any) {
+    serverLogger.error('Error during webhook GET verification', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
+  }
+}
+
+/**
+ * Facebook Webhook Event Processing Endpoint (POST)
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const rawBody = await req.text();
+    const signature = req.headers.get('x-hub-signature-256');
+    const appSecret = process.env.FACEBOOK_APP_SECRET;
+
+    // 1. Validate signature if Facebook App Secret is configured
+    if (appSecret && !verifyFacebookSignature(rawBody, signature, appSecret)) {
+      serverLogger.warn('Webhook request rejected due to invalid Facebook signature');
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
+    }
+
+    let payload: any;
+    try {
+      payload = JSON.parse(rawBody);
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
+
+    if (payload.object !== 'page') {
+      return NextResponse.json({ status: 'ignored' }, { status: 200 });
+    }
+
+    // 2. Process all entries and messaging events asynchronously
+    const entries = payload.entry || [];
+    for (const entry of entries) {
+      const fbPageId = entry.id;
+      const messagingEvents = entry.messaging || [];
+
+      for (const event of messagingEvents) {
+        const senderPsid = event.sender?.id;
+        const recipientPageId = event.recipient?.id || fbPageId;
+        const message = event.message;
+
+        // Skip events with no message or echo messages sent by page itself
+        if (!message || message.is_echo || !senderPsid) {
+          continue;
+        }
+
+        const messageId = message.mid;
+
+        // 3. Idempotency / Deduplication check
+        if (messageId && processedMessageIds.has(messageId)) {
+          serverLogger.info(`Duplicate message ${messageId} ignored`);
+          continue;
+        }
+        if (messageId) {
+          processedMessageIds.add(messageId);
+          // Limit cache size
+          if (processedMessageIds.size > 5000) {
+            const firstKey = processedMessageIds.values().next().value;
+            if (firstKey) processedMessageIds.delete(firstKey);
+          }
+        }
+
+        // 4. Find Page in DB
+        const page = await prisma.page.findFirst({
+          where: { facebookPageId: recipientPageId },
+          include: {
+            user: true,
+          },
+        });
+
+        if (!page) {
+          serverLogger.warn(`Page with Facebook ID ${recipientPageId} not found in database`);
+          continue;
+        }
+
+        const pageAccessToken = decrypt(page.pageAccessTokenEncrypted);
+
+        // 5. Extract message type and media content
+        let messageType = 'TEXT';
+        let messageText = message.text || '';
+        let mediaUrl: string | null = null;
+
+        if (message.attachments && message.attachments.length > 0) {
+          const attachment = message.attachments[0];
+          mediaUrl = attachment.payload?.url || null;
+          if (attachment.type === 'image') messageType = 'IMAGE';
+          else if (attachment.type === 'audio') messageType = 'AUDIO';
+          else if (attachment.type === 'video') messageType = 'VIDEO';
+          else messageType = 'ATTACHMENT';
+        }
+
+        // 6. Find or create Conversation
+        let conversation = await prisma.conversation.findUnique({
+          where: {
+            pageId_senderPsid: {
+              pageId: page.id,
+              senderPsid,
+            },
+          },
+        });
+
+        if (!conversation) {
+          conversation = await prisma.conversation.create({
+            data: {
+              userId: page.userId,
+              pageId: page.id,
+              senderPsid,
+              customerName: `Customer (${senderPsid.slice(-4)})`,
+              lastMessage: messageText || `[${messageType}]`,
+              lastMessageAt: new Date(),
+              status: 'ACTIVE',
+              aiEnabled: true,
+              unreadCount: 1,
+            },
+          });
+        } else {
+          conversation = await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: {
+              lastMessage: messageText || `[${messageType}]`,
+              lastMessageAt: new Date(),
+              unreadCount: { increment: 1 },
+            },
+          });
+        }
+
+        // 7. Save incoming message to database
+        await prisma.message.create({
+          data: {
+            conversationId: conversation.id,
+            userId: page.userId,
+            pageId: page.id,
+            senderPsid,
+            direction: 'INCOMING',
+            messageType,
+            messageText,
+            mediaUrl,
+            aiGenerated: false,
+          },
+        });
+
+        // 8. Check if AI should reply
+        if (!page.autoReplyEnabled || !conversation.aiEnabled || conversation.status === 'HUMAN_MODE') {
+          serverLogger.info(`Auto-reply skipped for conversation ${conversation.id} (Human mode or disabled)`);
+          continue;
+        }
+
+        // Send typing indicator
+        if (pageAccessToken) {
+          sendMessengerAction(senderPsid, 'typing_on', pageAccessToken).catch(() => {});
+        }
+
+        // Fetch recent conversation history
+        const recentMessages = await prisma.message.findMany({
+          where: { conversationId: conversation.id },
+          orderBy: { createdAt: 'desc' },
+          take: 8,
+          select: { direction: true, messageText: true },
+        });
+
+        const formattedHistory = recentMessages.reverse().map((m) => ({
+          direction: m.direction,
+          text: m.messageText || '',
+        }));
+
+        // 9. Generate AI reply
+        try {
+          const aiResult = await generateAIReply({
+            userId: page.userId,
+            pageId: page.id,
+            senderPsid,
+            incomingText: messageText,
+            incomingImageUrl: messageType === 'IMAGE' && mediaUrl ? mediaUrl : undefined,
+            conversationHistory: formattedHistory,
+          });
+
+          // 10. Send reply via Facebook Messenger Send API
+          if (pageAccessToken && aiResult.replyText) {
+            await sendMessengerText(senderPsid, aiResult.replyText, pageAccessToken);
+
+            // Send product image if enabled and available
+            if (page.productImageReply && aiResult.matchedProduct?.imageUrl) {
+              await sendMessengerImage(senderPsid, aiResult.matchedProduct.imageUrl, pageAccessToken);
+            }
+          }
+
+          // 11. Save outgoing AI message in DB
+          await prisma.message.create({
+            data: {
+              conversationId: conversation.id,
+              userId: page.userId,
+              pageId: page.id,
+              senderPsid,
+              direction: 'OUTGOING',
+              messageType: 'TEXT',
+              messageText: aiResult.replyText,
+              aiGenerated: true,
+              aiModel: aiResult.aiModel,
+            },
+          });
+
+          await prisma.conversation.update({
+            where: { id: conversation.id },
+            data: {
+              lastMessage: aiResult.replyText,
+              lastMessageAt: new Date(),
+            },
+          });
+
+          // 12. Auto-capture Order if detected by AI
+          if (page.orderDetection && aiResult.detectedOrder) {
+            const detected = aiResult.detectedOrder;
+            const newOrder = await prisma.order.create({
+              data: {
+                userId: page.userId,
+                pageId: page.id,
+                conversationId: conversation.id,
+                customerName: detected.customerName,
+                phone: detected.phone,
+                address: detected.address,
+                product: detected.product,
+                productId: detected.productId || null,
+                quantity: detected.quantity || 1,
+                price: detected.price || 0,
+                totalPrice: detected.totalPrice || 0,
+                status: 'PENDING',
+                source: 'MESSENGER_AI',
+              },
+            });
+
+            await logActivity({
+              userId: page.userId,
+              pageId: page.id,
+              action: 'ORDER_CAPTURED_BY_AI',
+              description: `AI স্বয়ংক্রিয়ভাবে নতুন অর্ডার ক্যাপচার করেছে: #${newOrder.id.slice(0, 8)} (${detected.customerName} - ${detected.phone})`,
+            });
+          }
+        } catch (aiErr: any) {
+          serverLogger.error('AI reply generation failed during webhook handling', aiErr);
+        }
+      }
+    }
+
+    return NextResponse.json({ status: 'EVENT_RECEIVED' }, { status: 200 });
+  } catch (error: any) {
+    serverLogger.error('Critical error in Facebook Webhook POST handler', error);
+    return NextResponse.json({ error: 'Internal Webhook Error' }, { status: 500 });
+  }
+}
