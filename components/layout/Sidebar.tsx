@@ -18,7 +18,6 @@ import {
   X,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
-import { useLanguage } from '@/components/language/LanguageProvider';
 
 interface SidebarProps {
   user?: {
@@ -36,29 +35,28 @@ export default function Sidebar({ user, isOpenMobile, onCloseMobile }: SidebarPr
   const pathname = usePathname();
   const router = useRouter();
   const toast = useToast();
-  const { lang, t } = useLanguage();
 
   const handleLogout = async () => {
     try {
       await fetch('/api/auth/logout', { method: 'POST' });
-      toast.success(lang === 'bn' ? 'সফলভাবে লগআউট হয়েছে!' : 'Logged out successfully!');
+      toast.success('সফলভাবে লগআউট হয়েছে!');
       router.push('/login');
       router.refresh();
     } catch (e) {
-      toast.error(lang === 'bn' ? 'লগআউট করতে ব্যর্থ হয়েছে।' : 'Failed to log out.');
+      toast.error('লগআউট করতে ব্যর্থ হয়েছে।');
     }
   };
 
   const navItems = [
-    { href: '/dashboard', label: lang === 'bn' ? 'ওভারভিউ' : 'Dashboard', icon: LayoutDashboard },
-    { href: '/dashboard/pages', label: lang === 'bn' ? 'পেজ সমূহ' : 'Facebook Pages', icon: Layers },
-    { href: '/dashboard/products', label: lang === 'bn' ? 'প্রোডাক্ট ইনভেন্টরি' : 'Products', icon: Package },
-    { href: '/dashboard/ai-rules', label: lang === 'bn' ? 'AI নিয়মাবলী' : 'AI Rules', icon: Bot },
-    { href: '/dashboard/conversations', label: lang === 'bn' ? 'কথোপকথন' : 'Conversations', icon: MessageSquare },
-    { href: '/dashboard/orders', label: lang === 'bn' ? 'অর্ডারসমূহ' : 'Orders', icon: ShoppingCart },
-    { href: '/dashboard/reports', label: lang === 'bn' ? 'রিপোর্ট ও অ্যানালিটিক্স' : 'Analytics', icon: BarChart3 },
-    { href: '/dashboard/settings', label: lang === 'bn' ? 'ব্যবসার সেটিংস' : 'Settings', icon: Settings },
-    { href: '/dashboard/support', label: lang === 'bn' ? 'সাপোর্ট গাইড' : 'Support', icon: HelpCircle },
+    { href: '/dashboard', label: 'ওভারভিউ', icon: LayoutDashboard },
+    { href: '/dashboard/pages', label: 'পেজ সমূহ', icon: Layers },
+    { href: '/dashboard/products', label: 'প্রোডাক্ট ইনভেন্টরি', icon: Package },
+    { href: '/dashboard/ai-rules', label: 'AI নিয়মাবলী', icon: Bot },
+    { href: '/dashboard/conversations', label: 'কথোপকথন', icon: MessageSquare },
+    { href: '/dashboard/orders', label: 'অর্ডারসমূহ', icon: ShoppingCart },
+    { href: '/dashboard/reports', label: 'রিপোর্ট ও অ্যানালিটিক্স', icon: BarChart3 },
+    { href: '/dashboard/settings', label: 'ব্যবসার সেটিংস', icon: Settings },
+    { href: '/dashboard/support', label: 'সাপোর্ট গাইড', icon: HelpCircle },
   ];
 
   return (
@@ -87,9 +85,7 @@ export default function Sidebar({ user, isOpenMobile, onCloseMobile }: SidebarPr
                 <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
                   ReplyX <span className="text-emerald-400 font-extrabold">AI</span>
                 </h1>
-                <p className="text-[10px] text-gray-400 font-medium tracking-wide">
-                  {lang === 'bn' ? 'স্মার্ট Messenger অটোমেশন' : 'Smart Messenger Automation'}
-                </p>
+                <p className="text-[10px] text-gray-400 font-medium tracking-wide">স্মার্ট Messenger অটোমেশন</p>
               </div>
             </Link>
             {onCloseMobile && (
@@ -105,7 +101,7 @@ export default function Sidebar({ user, isOpenMobile, onCloseMobile }: SidebarPr
           {/* Navigation Links */}
           <nav className="p-3 space-y-1">
             <div className="px-3 py-1.5 text-[11px] font-semibold tracking-wider text-gray-500 uppercase">
-              {lang === 'bn' ? 'মেনু' : 'MENU'}
+              মেনু
             </div>
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -138,15 +134,13 @@ export default function Sidebar({ user, isOpenMobile, onCloseMobile }: SidebarPr
                 {user?.fullName?.charAt(0) || 'U'}
               </div>
               <div className="overflow-hidden">
-                <p className="text-xs font-semibold text-gray-200 truncate">
-                  {user?.fullName || (lang === 'bn' ? 'ব্যবহারকারী' : 'User')}
-                </p>
+                <p className="text-xs font-semibold text-gray-200 truncate">{user?.fullName || 'ব্যবহারকারী'}</p>
                 <p className="text-[11px] text-gray-400 truncate">{user?.businessName || user?.email || 'Business'}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              title={lang === 'bn' ? 'সাইন আউট' : 'Sign Out'}
+              title="সাইন আউট"
               className="p-1.5 rounded-lg text-gray-400 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0"
             >
               <LogOut className="w-4 h-4" />
