@@ -378,7 +378,7 @@ export default function LandingPage() {
             <span className="font-bold text-gray-300">ReplyX AI</span>
             <span>— AI-Powered Facebook Messenger Automation</span>
           </div>
-          <p>© {new Date().getFullYear()} ReplyX AI. সর্বস্বত্ব সংরক্ষিত।</p>
+          <p>© <span suppressHydrationWarning>{new Date().getFullYear()}</span> ReplyX AI. সর্বস্বত্ব সংরক্ষিত।</p>
         </div>
       </footer>
     </div>

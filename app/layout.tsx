@@ -16,11 +16,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="bn" className="dark">
-      <body className="bg-[#090a0f] text-gray-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-300">
-        <ToastProvider>
-          {children}
-        </ToastProvider>
+    <html lang="bn" className="dark" suppressHydrationWarning>
+      <body
+        className="bg-[#090a0f] text-gray-100 antialiased selection:bg-emerald-500/30 selection:text-emerald-300"
+        suppressHydrationWarning
+      >
+        <ToastProvider>{children}</ToastProvider>
       </body>
     </html>
   );
