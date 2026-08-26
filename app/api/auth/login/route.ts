@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { ensureDatabaseReady } from '@/lib/db-init';
 import { comparePassword, signToken, AUTH_COOKIE_NAME } from '@/lib/auth';
 import { logActivity } from '@/lib/logger';
 
 export async function POST(req: NextRequest) {
   try {
+    await ensureDatabaseReady();
+
     const body = await req.json();
     const { email, password } = body;
 
@@ -44,11 +47,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Log login activity
-    await logActivity({
-      userId: user.id,
-      action: 'USER_LOGIN',
-      description: `ব্যবহারকারী সফলভাবে লগইন করেছেন: ${user.email}`,
-    });
+    try {
+      await logActivity({
+        userId: user.id,
+        action: 'USER_LOGIN',
+        description: `ব্যবহারকারী সফলভাবে লগইন করেছেন: ${user.email}`,
+      });
+    } catch (e) {
+      console.warn('Could not log login activity:', e);
+    }
 
     const token = signToken({
       userId: user.id,
