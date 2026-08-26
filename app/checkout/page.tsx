@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const toast = useToast();
@@ -421,7 +421,7 @@ export default function CheckoutPage() {
 
             {/* Payment Method Selector Tabs */}
             <div className="mb-6">
-              <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-2.5">
+              <label className="block text-xs font-bold text-[#c5cbd3] uppercase tracking-wider mb-2.5">
                 পেমেন্ট মাধ্যম বেছে নিন:
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -435,7 +435,7 @@ export default function CheckoutPage() {
                       className={`p-3.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1 ${
                         isSelected
                           ? 'bg-emerald-500/20 border-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/10 scale-[1.02]'
-                          : 'bg-[#080a12] border-[#1d2436] text-gray-400 hover:text-white hover:border-gray-600'
+                          : 'bg-[#080a12] border-[#1d2436] text-[#9ca3af] hover:text-white hover:border-gray-600'
                       }`}
                     >
                       <span className="text-sm font-black">{pm.displayName}</span>
@@ -451,7 +451,7 @@ export default function CheckoutPage() {
               <div className="mb-6 p-5 rounded-2xl bg-gradient-to-b from-[#090b14] to-[#0d101d] border border-emerald-500/30 space-y-4">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#1c2233]">
                   <div>
-                    <span className="text-[11px] text-gray-400 block font-semibold">
+                    <span className="text-[11px] text-[#9ca3af] block font-semibold">
                       {selectedMethod.displayName} টাকা পাঠানোর নম্বর:
                     </span>
                     <span className="text-xl font-mono font-black text-emerald-400 tracking-wider">
@@ -469,17 +469,17 @@ export default function CheckoutPage() {
                   </button>
                 </div>
 
-                <div className="text-xs text-gray-300 space-y-1.5 leading-relaxed bg-[#111524] p-4 rounded-xl border border-[#1e273c]">
+                <div className="text-xs text-[#d1d5db] space-y-1.5 leading-relaxed bg-[#111524] p-4 rounded-xl border border-[#1e273c]">
                   <p className="font-bold text-white flex items-center gap-1">
                     <span>নির্দেশনা (কিভাবে টাকা পাঠাবেন):</span>
                   </p>
-                  <p className="text-gray-300">
+                  <p className="text-[#d1d5db]">
                     ১. {selectedMethod.displayName} অ্যাপ বা কোড ডায়াল করে <strong className="text-emerald-400 font-mono">{selectedMethod.accountNumber}</strong> নম্বরে <strong className="text-white">Send Money</strong> করুন।
                   </p>
-                  <p className="text-gray-300">
+                  <p className="text-[#d1d5db]">
                     ২. টাকার পরিমাণ: <strong className="text-emerald-400 font-mono text-sm">৳ {selectedPackage?.price}</strong>
                   </p>
-                  <p className="text-gray-300">
+                  <p className="text-[#d1d5db]">
                     ৩. পেমেন্ট শেষে মেসেজ বা অ্যাপ থেকে পাওয়া <strong className="text-amber-300">Transaction ID (TrxID)</strong> নিচে বসিয়ে অর্ডার সম্পন্ন করুন।
                   </p>
                 </div>
@@ -489,40 +489,40 @@ export default function CheckoutPage() {
             {/* Order Form */}
             <form onSubmit={handleOrderSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-[#c5cbd3] uppercase tracking-wider mb-1.5">
                   যে নম্বর থেকে টাকা পাঠিয়েছেন (Sender Mobile Number) <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
-                  <Phone className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Phone className="w-4 h-4 text-[#6b7280] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     required
                     value={senderNumber}
                     onChange={(e) => setSenderNumber(e.target.value)}
                     placeholder="যেমন: 017XXXXXXXX"
-                    className="w-full pl-10 pr-4 py-3 bg-[#080a12] border border-[#1e2538] rounded-xl text-white placeholder-gray-600 text-xs font-mono focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-[#080a12] border border-[#1e2538] rounded-xl text-white placeholder:text-[#6b7280] text-xs font-mono focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-300 uppercase tracking-wider mb-1.5">
+                <label className="block text-xs font-bold text-[#c5cbd3] uppercase tracking-wider mb-1.5">
                   Transaction ID (TrxID) <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
-                  <Hash className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Hash className="w-4 h-4 text-[#6b7280] absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
                     required
                     value={transactionId}
                     onChange={(e) => setTransactionId(e.target.value)}
                     placeholder="যেমন: BLA8934JKA"
-                    className="w-full pl-10 pr-4 py-3 bg-[#080a12] border border-[#1e2538] rounded-xl text-white placeholder-gray-600 text-xs font-mono uppercase focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-[#080a12] border border-[#1e2538] rounded-xl text-white placeholder:text-[#6b7280] text-xs font-mono uppercase focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all"
                   />
                 </div>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-[#080a12] border border-[#1d2436] text-[11px] text-gray-400 flex items-center gap-2.5">
+              <div className="p-3.5 rounded-xl bg-[#080a12] border border-[#1d2436] text-[11px] text-[#9ca3af] flex items-center gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                 <span>অর্ডার করার কিছুক্ষণের মধ্যেই ট্রানজেকশন যাচাই করে আপনার ড্যাশবোর্ড একটিভ করে দেওয়া হবে।</span>
               </div>
@@ -558,7 +558,7 @@ export default function CheckoutPage() {
           </div>
           <div>
             <p className="font-bold text-white">{currentTicker.name}</p>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-[#9ca3af]">
               <span className="text-emerald-400 font-semibold">{currentTicker.time}</span> • {currentTicker.pkg} অর্ডার করেছেন
             </p>
           </div>
@@ -567,3 +567,21 @@ export default function CheckoutPage() {
     </div>
   );
 }
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#07090e] flex items-center justify-center text-white">
+          <div className="flex items-center gap-3">
+            <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-sm text-gray-400">চেকআউট পেজ লোড হচ্ছে...</span>
+          </div>
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
+  );
+}
+
