@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { ensureDatabaseReady } from '@/lib/db-init';
 import { requireAdmin } from '@/lib/auth';
 import { logActivity } from '@/lib/logger';
 
@@ -8,6 +9,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if ('response' in auth) return auth.response;
 
   try {
+    await ensureDatabaseReady();
+
     const { id } = params;
 
     const order = await prisma.packageOrder.findUnique({
@@ -27,7 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
 
     // Determine package details or fallback safely
-    let pkg = order.package;
+    let pkg: any = order.package;
     if (!pkg && order.packageId) {
       pkg = await prisma.package.findUnique({ where: { id: order.packageId } });
     }

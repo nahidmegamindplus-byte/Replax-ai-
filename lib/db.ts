@@ -5,18 +5,68 @@ import path from 'path';
 function getDatabaseUrl(): string {
   const envUrl = process.env.DATABASE_URL;
 
-  if (envUrl && envUrl.trim() !== '') {
-    // If it's a relative file URL like "file:./dev.db" or "file:dev.db", resolve to absolute path
-    if (envUrl.startsWith('file:./') || envUrl.startsWith('file:dev.db') || envUrl.startsWith('file:prisma/')) {
-      const cleanPath = envUrl.replace(/^file:(\.\/)?(prisma\/)?/, '');
-      const resolved = path.resolve(process.cwd(), 'prisma', cleanPath);
-      return `file:${resolved}`;
-    }
+  // If a remote database URL is configured (PostgreSQL, MySQL, Turso/LibSQL, etc.), use it directly
+  if (envUrl && !envUrl.startsWith('file:') && !envUrl.startsWith('./') && !envUrl.includes('dev.db')) {
     return envUrl;
   }
 
-  // Fallback to local prisma/dev.db
-  const localDb = path.resolve(process.cwd(), 'prisma', 'dev.db');
+  // Detect serverless environment (Vercel, Netlify, AWS Lambda)
+  const isServerless =
+    Boolean(process.env.VERCEL) ||
+    Boolean(process.env.NETLIFY) ||
+    Boolean(process.env.AWS_LAMBDA_FUNCTION_NAME) ||
+    Boolean(process.env.LAMBDA_TASK_ROOT) ||
+    process.env.NODE_ENV === 'production';
+
+  if (isServerless) {
+    try {
+      const tmpDir = '/tmp';
+      const tmpDbPath = path.join(tmpDir, 'replyx_dev.db');
+
+      if (!fs.existsSync(tmpDbPath)) {
+        // Look for source seed db in package bundle
+        const sourcePaths = [
+          path.resolve(process.cwd(), 'prisma', 'dev.db'),
+          path.resolve(process.cwd(), 'dev.db'),
+          path.join(__dirname, '..', '..', 'prisma', 'dev.db'),
+          path.join(__dirname, '..', 'prisma', 'dev.db'),
+        ];
+
+        let copied = false;
+        for (const src of sourcePaths) {
+          if (fs.existsSync(src)) {
+            try {
+              fs.copyFileSync(src, tmpDbPath);
+              fs.chmodSync(tmpDbPath, 0o666);
+              copied = true;
+              break;
+            } catch (err) {
+              console.warn('Failed to copy seed db to /tmp:', err);
+            }
+          }
+        }
+
+        if (!copied) {
+          // Create empty file in /tmp so SQLite can open and write schema
+          fs.writeFileSync(tmpDbPath, '');
+          fs.chmodSync(tmpDbPath, 0o666);
+        }
+      }
+
+      return `file:${tmpDbPath}`;
+    } catch (e) {
+      console.warn('Serverless /tmp db setup fallback:', e);
+    }
+  }
+
+  // Local environment fallback
+  const localPrismaDir = path.resolve(process.cwd(), 'prisma');
+  if (!fs.existsSync(localPrismaDir)) {
+    try {
+      fs.mkdirSync(localPrismaDir, { recursive: true });
+    } catch (e) {}
+  }
+  const localDb = path.resolve(localPrismaDir, 'dev.db');
   return `file:${localDb}`;
 }
 

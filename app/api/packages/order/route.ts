@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
+import { ensureDatabaseReady } from '@/lib/db-init';
 import { requireAuth } from '@/lib/auth';
 import { logActivity } from '@/lib/logger';
 
@@ -8,6 +9,7 @@ export async function POST(req: NextRequest) {
   if ('response' in auth) return auth.response;
 
   try {
+    await ensureDatabaseReady();
     const body = await req.json();
     const { packageId, paymentMethodId, paymentMethodName, senderNumber, transactionId, paymentProofUrl } = body;
 
