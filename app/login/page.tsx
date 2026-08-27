@@ -36,7 +36,10 @@ export default function LoginPage() {
       }
 
       toast.success('সফলভাবে লগইন হয়েছে!');
-      if (data.user?.role === 'ADMIN') {
+      const redirectParam = searchParams.get('redirect');
+      if (redirectParam) {
+        router.push(redirectParam);
+      } else if (data.user?.role === 'ADMIN') {
         router.push('/admin');
       } else if (data.user?.planStatus !== 'ACTIVE') {
         router.push('/subscribe');
