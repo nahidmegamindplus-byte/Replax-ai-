@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       success: true,
       settings: {
         enabled: isEnabled,
-        number: settingsMap['whatsapp_number'] || '+8801700000000',
+        number: settingsMap['whatsapp_number'] || '+8801521716613',
         message:
           settingsMap['whatsapp_message'] ||
           'আসসালামু আলাইকুম, আমি ReplyX AI সম্পর্কে তথ্য জানতে চাই।',

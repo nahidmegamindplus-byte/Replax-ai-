@@ -29,7 +29,7 @@ export default function AdminSettingsPage() {
   // WhatsApp Settings Form State
   const [whatsappForm, setWhatsappForm] = useState({
     enabled: true,
-    number: '+8801700000000',
+    number: '+8801521716613',
     message: 'আসসালামু আলাইকুম, আমি ReplyX AI সম্পর্কে তথ্য জানতে চাই।',
     position: 'RIGHT',
   });
@@ -42,7 +42,7 @@ export default function AdminSettingsPage() {
       if (data.success && data.settings) {
         setWhatsappForm({
           enabled: data.settings.enabled ?? true,
-          number: data.settings.number || '+8801700000000',
+          number: data.settings.number || '+8801521716613',
           message: data.settings.message || 'আসসালামু আলাইকুম, আমি ReplyX AI সম্পর্কে তথ্য জানতে চাই।',
           position: data.settings.position || 'RIGHT',
         });
@@ -176,7 +176,7 @@ export default function AdminSettingsPage() {
                       required
                       value={whatsappForm.number}
                       onChange={(e) => setWhatsappForm({ ...whatsappForm, number: e.target.value })}
-                      placeholder="যেমন: +8801711223344"
+                      placeholder="যেমন: +8801521716613"
                       className="w-full pl-10 pr-4 py-2.5 bg-[#090710] border border-purple-900/30 rounded-xl text-white font-mono text-xs focus:outline-none focus:border-emerald-500"
                     />
                   </div>

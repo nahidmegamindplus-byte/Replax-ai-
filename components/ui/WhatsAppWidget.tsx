@@ -12,7 +12,7 @@ interface WhatsAppSettings {
 export default function WhatsAppWidget() {
   const [settings, setSettings] = useState<WhatsAppSettings>({
     enabled: true,
-    number: '+8801700000000',
+    number: '+8801521716613',
     message: 'আসসালামু আলাইকুম, আমি ReplyX AI সম্পর্কে তথ্য জানতে চাই।',
     position: 'RIGHT',
   });
