@@ -2,16 +2,71 @@ import { NextRequest } from 'next/server';
 
 /**
  * Get the application's base URL dynamically.
- * Works seamlessly across Localhost, Ngrok/Cloudflare tunnels, and Netlify production.
+ * Works seamlessly across Hostinger (VPS/Cloud/Node.js/LiteSpeed/Nginx), Vercel, Netlify,
+ * Ngrok/Cloudflare tunnels, and Localhost.
  */
 export function getAppUrl(req?: NextRequest): string {
-  // 1. Explicitly configured APP_URL or NEXT_PUBLIC_APP_URL
+  // 1. If incoming HTTP request is present, dynamically extract the actual Hostinger / live domain
+  if (req) {
+    // Check Forwarded Host headers (standard reverse proxy headers used by Hostinger, Cloudflare, Nginx, LiteSpeed)
+    const rawForwardedHost =
+      req.headers.get('x-forwarded-host') ||
+      req.headers.get('x-original-host') ||
+      req.headers.get('host') ||
+      req.headers.get('origin');
+
+    if (rawForwardedHost) {
+      // Split in case of multiple proxies: "client.com, proxy.hostinger.com"
+      const cleanHost = rawForwardedHost.split(',')[0].trim().replace(/^https?:\/\//, '').replace(/\/+$/, '');
+
+      // Determine protocol
+      const forwardedProto = req.headers.get('x-forwarded-proto')
+        ? req.headers.get('x-forwarded-proto')!.split(',')[0].trim()
+        : null;
+      const isSsl = req.headers.get('x-forwarded-ssl') === 'on';
+
+      let proto = 'https';
+      if (cleanHost.includes('localhost') || cleanHost.includes('127.0.0.1') || cleanHost.includes('0.0.0.0')) {
+        proto = forwardedProto || 'http';
+      } else {
+        // For live domains (Hostinger / custom domains), always force https for Meta / Facebook Webhooks
+        proto = forwardedProto === 'http' && cleanHost.includes('localhost') ? 'http' : 'https';
+      }
+
+      if (cleanHost) {
+        return `${proto}://${cleanHost}`.replace(/\/+$/, '');
+      }
+    }
+
+    if (req.nextUrl && req.nextUrl.origin && !req.nextUrl.origin.includes('0.0.0.0')) {
+      const origin = req.nextUrl.origin.replace(/\/+$/, '');
+      // Ensure https on public domains
+      if (!origin.includes('localhost') && !origin.includes('127.0.0.1') && origin.startsWith('http://')) {
+        return origin.replace('http://', 'https://');
+      }
+      return origin;
+    }
+  }
+
+  // 2. Check explicitly configured WEBHOOK_BASE_URL (for ngrok / tunnels)
+  if (process.env.WEBHOOK_BASE_URL && process.env.WEBHOOK_BASE_URL.trim()) {
+    return process.env.WEBHOOK_BASE_URL.trim().replace(/\/+$/, '');
+  }
+
+  // 3. Explicitly configured APP_URL or NEXT_PUBLIC_APP_URL (if not generic localhost)
   const configuredAppUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL;
-  if (configuredAppUrl && configuredAppUrl.trim()) {
+  if (configuredAppUrl && configuredAppUrl.trim() && !configuredAppUrl.includes('localhost:3000')) {
     return configuredAppUrl.trim().replace(/\/+$/, '');
   }
 
-  // 2. Netlify automated production / deploy environment variables
+  // 4. Hostinger / Vercel / Netlify environment variables
+  if (process.env.HOSTINGER_URL && process.env.HOSTINGER_URL.trim()) {
+    return process.env.HOSTINGER_URL.trim().replace(/\/+$/, '');
+  }
+  if (process.env.VERCEL_URL && process.env.VERCEL_URL.trim()) {
+    const vUrl = process.env.VERCEL_URL.trim();
+    return vUrl.startsWith('http') ? vUrl.replace(/\/+$/, '') : `https://${vUrl}`;
+  }
   if (process.env.URL && process.env.URL.trim()) {
     return process.env.URL.trim().replace(/\/+$/, '');
   }
@@ -19,24 +74,12 @@ export function getAppUrl(req?: NextRequest): string {
     return process.env.DEPLOY_PRIME_URL.trim().replace(/\/+$/, '');
   }
 
-  // 3. Extract dynamically from incoming HTTP request headers if provided
-  if (req) {
-    const forwardedProto = req.headers.get('x-forwarded-proto') || 'https';
-    const forwardedHost = req.headers.get('x-forwarded-host') || req.headers.get('host');
-    if (forwardedHost) {
-      // Determine protocol: if localhost, use http unless proto specified
-      const proto = forwardedHost.includes('localhost') || forwardedHost.includes('127.0.0.1')
-        ? (req.headers.get('x-forwarded-proto') || 'http')
-        : (forwardedProto || 'https');
-      return `${proto}://${forwardedHost}`.replace(/\/+$/, '');
-    }
-
-    if (req.nextUrl && req.nextUrl.origin) {
-      return req.nextUrl.origin.replace(/\/+$/, '');
-    }
+  // 5. If APP_URL was configured as localhost:3000, return it
+  if (configuredAppUrl && configuredAppUrl.trim()) {
+    return configuredAppUrl.trim().replace(/\/+$/, '');
   }
 
-  // 4. Default fallback for local development
+  // 6. Default fallback for local development
   return 'http://localhost:3000';
 }
 

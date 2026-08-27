@@ -72,6 +72,22 @@ export default function PagesManagementPage() {
     fetchPages();
   }, []);
 
+  const getDisplayWebhookUrl = (serverUrl?: string | null) => {
+    if (typeof window !== 'undefined' && window.location.origin) {
+      // If serverUrl is empty, localhost, or doesn't match current live domain (and isn't a custom tunnel)
+      if (
+        !serverUrl ||
+        serverUrl.includes('localhost') ||
+        serverUrl.includes('127.0.0.1') ||
+        (!serverUrl.includes('ngrok') && !serverUrl.includes('trycloudflare') && !serverUrl.includes('loca.lt'))
+      ) {
+        return `${window.location.origin}/api/webhooks/facebook`;
+      }
+      return serverUrl;
+    }
+    return serverUrl || 'https://yourdomain.com/api/webhooks/facebook';
+  };
+
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKey(key);
@@ -280,7 +296,7 @@ export default function PagesManagementPage() {
                     <div className="flex items-center justify-between text-[11px] text-gray-400 font-medium mb-1">
                       <span>Webhook Callback URL:</span>
                       <button
-                        onClick={() => handleCopy(page.webhookUrl || '', `url-${page.id}`)}
+                        onClick={() => handleCopy(getDisplayWebhookUrl(page.webhookUrl), `url-${page.id}`)}
                         className="text-emerald-400 hover:text-emerald-300 flex items-center gap-1"
                       >
                         {copiedKey === `url-${page.id}` ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -288,7 +304,7 @@ export default function PagesManagementPage() {
                       </button>
                     </div>
                     <p className="text-xs font-mono text-gray-300 truncate bg-[#121624] px-2.5 py-1.5 rounded-lg border border-[#1e2538]">
-                      {page.webhookUrl || 'URL Pending'}
+                      {getDisplayWebhookUrl(page.webhookUrl)}
                     </p>
                   </div>
 
