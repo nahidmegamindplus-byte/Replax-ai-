@@ -187,7 +187,7 @@ export async function POST(req: NextRequest) {
         }
 
         // 7. Save incoming message to database
-        await prisma.message.create({
+        const savedIncomingMessage = await prisma.message.create({
           data: {
             conversationId: conversation.id,
             userId: page.userId,
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
           text: m.messageText || '',
         }));
 
-        // 9. Generate AI reply
+        // 9. Generate AI reply (handles Text, Image understanding, and Voice Audio natively)
         try {
           const aiResult = await generateAIReply({
             userId: page.userId,
@@ -233,8 +233,19 @@ export async function POST(req: NextRequest) {
             senderPsid,
             incomingText: messageText,
             incomingImageUrl: messageType === 'IMAGE' && mediaUrl ? mediaUrl : undefined,
+            incomingAudioUrl: messageType === 'AUDIO' && mediaUrl ? mediaUrl : undefined,
             conversationHistory: formattedHistory,
           });
+
+          // If audio was transcribed, save transcription to database for Dashboard display
+          if (aiResult.transcription && savedIncomingMessage?.id) {
+            try {
+              await prisma.message.update({
+                where: { id: savedIncomingMessage.id },
+                data: { transcription: aiResult.transcription },
+              });
+            } catch (trErr) {}
+          }
 
           // 10. Send reply via Facebook Messenger Send API
           if (pageAccessToken && aiResult.replyText) {
