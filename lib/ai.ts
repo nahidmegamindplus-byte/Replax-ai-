@@ -129,7 +129,7 @@ async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg
     const rawMime = res.headers.get('content-type') || defaultMime;
     let cleanMime = rawMime.split(';')[0].trim().toLowerCase();
 
-    // Map common audio/video types from Facebook CDN
+    // Map common audio types from Facebook CDN
     if (cleanMime === 'application/octet-stream' || cleanMime === 'binary/octet-stream') {
       if (url.includes('.mp4') || defaultMime.includes('audio') || defaultMime.includes('mp4')) {
         cleanMime = 'audio/mp4';
@@ -343,13 +343,20 @@ Your primary goal is to assist customers on Facebook Messenger politely, accurat
 1. If the customer sends an IMAGE:
    - Identify the product, garment, watch, shoe, color, model, or inquiry in the image.
    - Cross-check against the Live Product Inventory below.
-   - If matched, provide the exact price, stock status, discount, and asking if they would like to place an order.
+   - If matched, provide the exact price, stock status, discount, and ask if they would like to order.
    - If not found in inventory, politely explain that this exact item is currently out of stock and recommend similar items from the list.
 2. If the customer sends a VOICE / AUDIO message:
-   - Listen to their voice message in Bengali / Banglish / English.
-   - Understand their question or order intent accurately and respond naturally in warm, friendly Bengali.
+   - First listen to their voice message in Bengali / Banglish / English.
+   - Understand what the customer is asking (e.g. asking for product price, photo, details, discount, delivery, or wanting to order).
+   - Reply warmly, directly answering their voice inquiry.
 3. If the customer sends TEXT:
    - Answer directly, briefly, and helpfully.
+
+[SENDING PRODUCT IMAGES FROM INVENTORY]
+- When a customer asks for a product photo, picture ("ছবি দেখান", "pic", "photo", "details"), or when you recommend a specific product from the inventory:
+- Output a product image trigger tag at the very end of your reply in this format:
+<<<SEND_PRODUCT_IMAGE: "PRODUCT_ID_OR_NAME" >>>
+Example: <<<SEND_PRODUCT_IMAGE: "1" >>> or <<<SEND_PRODUCT_IMAGE: "Black Polo Shirt" >>>
 
 [STRICT INVENTORY & PRICING RULES]
 1. Never invent, hallucinate, or guess prices or products not present in the inventory list below.
@@ -445,7 +452,7 @@ If phone or address is missing, politely ask the customer for their mobile numbe
           },
         });
         promptContent.push(
-          'Customer sent a voice note above. Please listen to their voice message, understand their intent, transcribe what they said if needed, and reply helpfully according to the inventory.'
+          'Customer sent a voice note above. Please listen to what they said in Bengali / English, understand their question or order, and reply directly with product info, price, or order confirmation.'
         );
       }
 
@@ -629,24 +636,75 @@ If phone or address is missing, politely ask the customer for their mobile numbe
     }
   }
 
-  // 5. Search for matched product to attach high-res image
+  // 5. Extract explicit Product Image Send Tag if present
+  let explicitProductTrigger: string | null = null;
+  const imageTriggerRegex = /<<<SEND_PRODUCT_IMAGE:\s*["']?([\s\S]*?)["']?\s*>>>/;
+  const imgMatch = replyText.match(imageTriggerRegex);
+  if (imgMatch && imgMatch[1]) {
+    explicitProductTrigger = imgMatch[1].trim();
+    replyText = replyText.replace(imageTriggerRegex, '').trim();
+  }
+
+  // 6. Search for matched product to attach image
   let matchedProduct: any = null;
   if (products.length > 0) {
-    const cleanLowerReply = replyText.toLowerCase();
-    for (const p of products) {
-      if (cleanLowerReply.includes(p.name.toLowerCase()) || (p.sku && cleanLowerReply.includes(p.sku.toLowerCase()))) {
+    // 6a. Match via explicit AI tag
+    if (explicitProductTrigger) {
+      const cleanTrigger = explicitProductTrigger.toLowerCase();
+      const directMatch = products.find(
+        (p) =>
+          p.id === explicitProductTrigger ||
+          p.name.toLowerCase() === cleanTrigger ||
+          p.name.toLowerCase().includes(cleanTrigger) ||
+          (p.sku && p.sku.toLowerCase() === cleanTrigger)
+      );
+      if (directMatch && directMatch.imageUrl) {
         matchedProduct = {
-          id: p.id,
-          name: p.name,
-          price: p.discountPrice || p.price,
-          imageUrl: p.imageUrl,
+          id: directMatch.id,
+          name: directMatch.name,
+          price: directMatch.discountPrice || directMatch.price,
+          imageUrl: directMatch.imageUrl,
         };
-        break;
+      }
+    }
+
+    // 6b. Match via detected order
+    if (!matchedProduct && detectedOrder) {
+      const orderProductMatch = products.find(
+        (p) =>
+          (detectedOrder.productId && p.id === detectedOrder.productId) ||
+          p.name.toLowerCase() === (detectedOrder.product || '').toLowerCase()
+      );
+      if (orderProductMatch && orderProductMatch.imageUrl) {
+        matchedProduct = {
+          id: orderProductMatch.id,
+          name: orderProductMatch.name,
+          price: orderProductMatch.discountPrice || orderProductMatch.price,
+          imageUrl: orderProductMatch.imageUrl,
+        };
+      }
+    }
+
+    // 6c. Match via content keywords or query intent
+    if (!matchedProduct) {
+      const combinedText = `${replyText} ${incomingText} ${finalTranscription || ''}`.toLowerCase();
+      for (const p of products) {
+        if (!p.imageUrl) continue;
+        const pName = p.name.toLowerCase();
+        if (combinedText.includes(pName) || (p.sku && combinedText.includes(p.sku.toLowerCase()))) {
+          matchedProduct = {
+            id: p.id,
+            name: p.name,
+            price: p.discountPrice || p.price,
+            imageUrl: p.imageUrl,
+          };
+          break;
+        }
       }
     }
   }
 
-  // 6. Increment user's monthly message count for SaaS subscription tracking
+  // 7. Increment user's monthly message count for SaaS subscription tracking
   try {
     await prisma.user.update({
       where: { id: userId },

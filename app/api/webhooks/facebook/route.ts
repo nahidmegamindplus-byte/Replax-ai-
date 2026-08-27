@@ -251,13 +251,35 @@ export async function POST(req: NextRequest) {
           if (pageAccessToken && aiResult.replyText) {
             await sendMessengerText(senderPsid, aiResult.replyText, pageAccessToken);
 
-            // Send product image if enabled and available
+            // Send product image from inventory if available
             if (page.productImageReply && aiResult.matchedProduct?.imageUrl) {
-              await sendMessengerImage(senderPsid, aiResult.matchedProduct.imageUrl, pageAccessToken);
+              const imageSendResult = await sendMessengerImage(
+                senderPsid,
+                aiResult.matchedProduct.imageUrl,
+                pageAccessToken
+              );
+
+              // Save outgoing image record in DB
+              if (imageSendResult.success) {
+                await prisma.message.create({
+                  data: {
+                    conversationId: conversation.id,
+                    userId: page.userId,
+                    pageId: page.id,
+                    senderPsid,
+                    direction: 'OUTGOING',
+                    messageType: 'IMAGE',
+                    mediaUrl: aiResult.matchedProduct.imageUrl,
+                    messageText: `[পণ্য ছবি: ${aiResult.matchedProduct.name} - ৳${aiResult.matchedProduct.price}]`,
+                    aiGenerated: true,
+                    aiModel: aiResult.aiModel,
+                  },
+                });
+              }
             }
           }
 
-          // 11. Save outgoing AI message in DB
+          // 11. Save outgoing AI text message in DB
           await prisma.message.create({
             data: {
               conversationId: conversation.id,
