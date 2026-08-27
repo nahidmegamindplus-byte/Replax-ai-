@@ -111,7 +111,7 @@ export interface AIResponseResult {
 async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg'): Promise<{ base64: string; mimeType: string } | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
 
     const res = await fetch(url, {
       signal: controller.signal,
@@ -129,18 +129,21 @@ async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg
     const rawMime = res.headers.get('content-type') || defaultMime;
     let cleanMime = rawMime.split(';')[0].trim().toLowerCase();
 
-    // Map common audio types from Facebook CDN
-    if (cleanMime === 'application/octet-stream' || cleanMime === 'binary/octet-stream') {
-      if (url.includes('.mp4') || defaultMime.includes('audio') || defaultMime.includes('mp4')) {
+    // Map common audio types from Facebook Messenger CDN
+    if (cleanMime === 'application/octet-stream' || cleanMime === 'binary/octet-stream' || !cleanMime.startsWith('audio/')) {
+      const lowerUrl = url.toLowerCase();
+      if (lowerUrl.includes('.mp4') || lowerUrl.includes('audio_mp4') || defaultMime.includes('audio') || defaultMime.includes('mp4')) {
         cleanMime = 'audio/mp4';
-      } else if (url.includes('.aac')) {
+      } else if (lowerUrl.includes('.aac')) {
         cleanMime = 'audio/aac';
-      } else if (url.includes('.mp3')) {
+      } else if (lowerUrl.includes('.mp3')) {
         cleanMime = 'audio/mp3';
-      } else if (url.includes('.ogg')) {
+      } else if (lowerUrl.includes('.ogg') || lowerUrl.includes('opus')) {
         cleanMime = 'audio/ogg';
-      } else if (url.includes('.wav')) {
+      } else if (lowerUrl.includes('.wav')) {
         cleanMime = 'audio/wav';
+      } else if (lowerUrl.includes('.m4a')) {
+        cleanMime = 'audio/mp4';
       } else {
         cleanMime = defaultMime;
       }
@@ -157,7 +160,7 @@ async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg
 }
 
 /**
- * Transcribe voice / audio message using Gemini 1.5 Flash (multilingual Bangla/English speech-to-text)
+ * Transcribe voice / audio message using Gemini (multilingual Bangla, regional dialects, Banglish, and English speech-to-text)
  */
 async function transcribeAudioWithGemini(
   base64Audio: string,
@@ -175,7 +178,17 @@ async function transcribeAudioWithGemini(
           mimeType: mimeType || 'audio/mp4',
         },
       },
-      'Listen to this voice message carefully. It is from a customer on Facebook Messenger (spoken in Bengali, English, Sylheti, Chatgaiya, or Banglish). Please transcribe exactly what the speaker is saying in natural Bengali or English. Output ONLY the raw transcription without any preamble or explanation.',
+      `You are a high-accuracy multilingual audio speech-to-text expert specializing in Bangladeshi dialects and colloquial speech.
+Listen to this voice message from a customer on Facebook Messenger / WhatsApp.
+
+Language / Dialect Context:
+- Standard Bengali (বাংলা), Regional dialects (Sylheti, Chittagonian/Chatgaiya, Noakhali, Barisal, Mymensingh, Rajshahi, Rangpur, etc.), Banglish, and English.
+- Customers commonly ask about: product prices, photos, delivery charges, stock availability, cash on delivery (COD), sizes (M, L, XL, XXL), colors, and order placement (giving phone numbers, addresses, names).
+
+Strict Rules:
+1. Transcribe EXACTLY what the customer said in natural Bengali (or English if they spoke English).
+2. If the audio is completely silent, blank, only background noise/music, inaudible whisper, or heavily distorted/corrupted, output EXACTLY: "[UNINTELLIGIBLE_AUDIO]".
+3. Do NOT add any preamble, quotes, explanations, or formatting. Output ONLY the raw transcribed words or "[UNINTELLIGIBLE_AUDIO]".`,
     ]);
 
     const text = result.response.text()?.trim();
@@ -340,23 +353,28 @@ You are ReplyX AI, an expert, high-converting sales and customer care AI assista
 Your primary goal is to assist customers on Facebook Messenger politely, accurately, and naturally in Bangla, Banglish, or English.
 
 [MULTIMODAL & VOICE / IMAGE UNDERSTANDING RULES]
-1. If the customer sends an IMAGE:
+1. If the customer sends a VOICE / AUDIO message:
+   - First listen to their voice message in Bengali (বাংলা), regional dialects (Sylheti, Chatgaiya, Noakhali, etc.), Banglish, or English.
+   - Understand what the customer is asking (e.g. asking for product price, photo, details, discount, delivery charge, sizes, or placing an order).
+   - If the voice message was unclear, inaudible, or unintelligible, NEVER guess or hallucinate. Politely ask the customer in polite Bengali to repeat their voice message or write down their query.
+   - If the voice message is understood, reply warmly and directly answer their voice inquiry.
+
+2. If the customer sends an IMAGE:
    - Identify the product, garment, watch, shoe, color, model, or inquiry in the image.
    - Cross-check against the Live Product Inventory below.
    - If matched, provide the exact price, stock status, discount, and ask if they would like to order.
    - If not found in inventory, politely explain that this exact item is currently out of stock and recommend similar items from the list.
-2. If the customer sends a VOICE / AUDIO message:
-   - First listen to their voice message in Bengali / Banglish / English.
-   - Understand what the customer is asking (e.g. asking for product price, photo, details, discount, delivery, or wanting to order).
-   - Reply warmly, directly answering their voice inquiry.
+
 3. If the customer sends TEXT:
    - Answer directly, briefly, and helpfully.
 
-[SENDING PRODUCT IMAGES FROM INVENTORY]
-- When a customer asks for a product photo, picture ("ছবি দেখান", "pic", "photo", "details"), or when you recommend a specific product from the inventory:
-- Output a product image trigger tag at the very end of your reply in this format:
+[SENDING PRODUCT IMAGES FROM INVENTORY (পণ্য ছবি পাঠানোর নিয়মাবলী)]
+- যখন কোনো গ্রাহক কোনো পণ্যের ছবি/পিক দেখতে চান (যেমন: "ছবি দেন", "পিক দেখতে চাই", "photo pathan", "pic dekhaw", "ছবি আছে?", "কালারগুলো দেখতে চাই"), অথবা ভয়েসে ছবি চান:
+- ইনভেন্টরি থেকে সংশ্লিষ্ট পণ্যের নাম ও দাম সুন্দরভাবে জানান।
+- এবং উত্তরের একেবারে শেষে বাধ্যতামূলকভাবে এই ট্যাগটি যোগ করুন:
 <<<SEND_PRODUCT_IMAGE: "PRODUCT_ID_OR_NAME" >>>
-Example: <<<SEND_PRODUCT_IMAGE: "1" >>> or <<<SEND_PRODUCT_IMAGE: "Black Polo Shirt" >>>
+উদাহরণ: <<<SEND_PRODUCT_IMAGE: "1" >>> অথবা <<<SEND_PRODUCT_IMAGE: "Black Polo Shirt" >>>
+- এটি ইনভেন্টরি থেকে গ্রাহকের মেসেঞ্জারে স্বয়ংক্রিয়ভাবে পণ্যের ছবি পাঠিয়ে দেবে।
 
 [STRICT INVENTORY & PRICING RULES]
 1. Never invent, hallucinate, or guess prices or products not present in the inventory list below.
@@ -402,13 +420,38 @@ If phone or address is missing, politely ask the customer for their mobile numbe
 
   if (incomingAudioUrl && page.voiceProcessing) {
     audioData = await fetchMediaAsBase64(incomingAudioUrl, 'audio/mp4');
-    // If we have Gemini key or OpenAI key, generate a transcription for non-Gemini providers or for message logging
+    // Transcribe audio using Gemini Speech-to-Text
     if (audioData && !finalTranscription) {
       const transcribeKey = adminAi.geminiKey || apiKey;
       if (transcribeKey) {
         finalTranscription = await transcribeAudioWithGemini(audioData.base64, audioData.mimeType, transcribeKey);
       }
     }
+  }
+
+  // Check if incoming message is an unintelligible voice note
+  const isUnintelligibleVoice =
+    Boolean(incomingAudioUrl) &&
+    (!audioData ||
+      !finalTranscription ||
+      finalTranscription === '[UNINTELLIGIBLE_AUDIO]' ||
+      finalTranscription.trim() === '' ||
+      finalTranscription.trim() === '...' ||
+      finalTranscription.toLowerCase().includes('unintelligible'));
+
+  // If customer sent a voice note that could not be clearly understood, NEVER guess or hallucinate
+  if (incomingAudioUrl && isUnintelligibleVoice) {
+    replyText = `সম্মানিত গ্রাহক, আপনার ভয়েস মেসেজটি স্পষ্টভাবে বোঝা যায়নি বা শোনা যায়নি। 😊\n\nঅনুগ্রহ করে ভয়েস মেসেজটি পুনরায় পাঠান অথবা আপনার প্রশ্নটি লিখে জানান, আমরা দ্রুত বিস্তারিত জানিয়ে সহায়তা করব!`;
+    finalTranscription = finalTranscription === '[UNINTELLIGIBLE_AUDIO]' ? '(অস্পষ্ট বা নীরব ভয়েস)' : (finalTranscription || '(ভয়েস বোঝা যায়নি)');
+
+    return {
+      replyText,
+      transcription: finalTranscription,
+      matchedProduct: null,
+      detectedOrder: null,
+      aiModel: modelName || 'gemini-1.5-flash',
+      provider: provider || 'GEMINI',
+    };
   }
 
   // 3. Dispatch to the configured AI Provider (GEMINI / GOROUTER / DEEPSEEK / OPENAI)
@@ -451,9 +494,15 @@ If phone or address is missing, politely ask the customer for their mobile numbe
             mimeType: audioData.mimeType,
           },
         });
-        promptContent.push(
-          'Customer sent a voice note above. Please listen to what they said in Bengali / English, understand their question or order, and reply directly with product info, price, or order confirmation.'
-        );
+        if (finalTranscription) {
+          promptContent.push(
+            `Customer sent a voice note above. Spoken text transcribed with high accuracy: "${finalTranscription}".\nPlease listen to what they said in Bengali / English, understand their inquiry/order, and reply directly with product details, price, photo tag if requested, or order confirmation.`
+          );
+        } else {
+          promptContent.push(
+            'Customer sent a voice note above. Please listen to what they said in Bengali / English, understand their question or order, and reply directly with product info, price, or order confirmation.'
+          );
+        }
       }
 
       // Add image payload if present

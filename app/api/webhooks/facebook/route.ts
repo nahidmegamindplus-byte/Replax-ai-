@@ -9,6 +9,7 @@ import {
 } from '@/lib/facebook';
 import { generateAIReply } from '@/lib/ai';
 import { serverLogger, logActivity } from '@/lib/logger';
+import { getAppUrl } from '@/lib/url';
 
 // In-memory cache for webhook message deduplication / idempotency (stores message IDs for 10 mins)
 const processedMessageIds = new Set<string>();
@@ -143,13 +144,40 @@ export async function POST(req: NextRequest) {
         let mediaUrl: string | null = null;
 
         if (message.attachments && message.attachments.length > 0) {
-          const attachment = message.attachments[0];
-          mediaUrl = attachment.payload?.url || null;
-          if (attachment.type === 'image') messageType = 'IMAGE';
-          else if (attachment.type === 'audio') messageType = 'AUDIO';
-          else if (attachment.type === 'video') messageType = 'VIDEO';
-          else messageType = 'ATTACHMENT';
+          for (const attachment of message.attachments) {
+            const attachUrl = attachment.payload?.url || null;
+            const attachType = attachment.type || '';
+            const lowerUrl = (attachUrl || '').toLowerCase();
+
+            if (
+              attachType === 'audio' ||
+              lowerUrl.includes('.mp4') ||
+              lowerUrl.includes('audio_mp4') ||
+              lowerUrl.includes('.aac') ||
+              lowerUrl.includes('.mp3') ||
+              lowerUrl.includes('.m4a') ||
+              lowerUrl.includes('.ogg') ||
+              lowerUrl.includes('.wav') ||
+              lowerUrl.includes('audioclip')
+            ) {
+              messageType = 'AUDIO';
+              mediaUrl = attachUrl;
+              break;
+            } else if (attachType === 'image') {
+              messageType = 'IMAGE';
+              mediaUrl = attachUrl;
+            } else if (attachType === 'video') {
+              messageType = 'VIDEO';
+              mediaUrl = attachUrl;
+            } else if (!mediaUrl && attachUrl) {
+              mediaUrl = attachUrl;
+              messageType = 'ATTACHMENT';
+            }
+          }
         }
+
+        const displayLastMessage =
+          messageText || (messageType === 'AUDIO' ? '🎙️ ভয়েস মেসেজ' : `[${messageType}]`);
 
         // 6. Find or create Conversation
         let conversation = await prisma.conversation.findUnique({
@@ -168,7 +196,7 @@ export async function POST(req: NextRequest) {
               pageId: page.id,
               senderPsid,
               customerName: `Customer (${senderPsid.slice(-4)})`,
-              lastMessage: messageText || `[${messageType}]`,
+              lastMessage: displayLastMessage,
               lastMessageAt: new Date(),
               status: 'ACTIVE',
               aiEnabled: true,
@@ -179,7 +207,7 @@ export async function POST(req: NextRequest) {
           conversation = await prisma.conversation.update({
             where: { id: conversation.id },
             data: {
-              lastMessage: messageText || `[${messageType}]`,
+              lastMessage: displayLastMessage,
               lastMessageAt: new Date(),
               unreadCount: { increment: 1 },
             },
@@ -253,9 +281,14 @@ export async function POST(req: NextRequest) {
 
             // Send product image from inventory if available
             if (page.productImageReply && aiResult.matchedProduct?.imageUrl) {
+              let fullImgUrl = aiResult.matchedProduct.imageUrl;
+              if (fullImgUrl.startsWith('/')) {
+                fullImgUrl = `${getAppUrl(req)}${fullImgUrl}`;
+              }
+
               const imageSendResult = await sendMessengerImage(
                 senderPsid,
-                aiResult.matchedProduct.imageUrl,
+                fullImgUrl,
                 pageAccessToken
               );
 
@@ -269,7 +302,7 @@ export async function POST(req: NextRequest) {
                     senderPsid,
                     direction: 'OUTGOING',
                     messageType: 'IMAGE',
-                    mediaUrl: aiResult.matchedProduct.imageUrl,
+                    mediaUrl: fullImgUrl,
                     messageText: `[পণ্য ছবি: ${aiResult.matchedProduct.name} - ৳${aiResult.matchedProduct.price}]`,
                     aiGenerated: true,
                     aiModel: aiResult.aiModel,

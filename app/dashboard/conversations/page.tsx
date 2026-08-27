@@ -406,15 +406,29 @@ export default function ConversationsPage() {
                           {/* Image Attachment if present */}
                           {m.mediaUrl && m.messageType === 'IMAGE' && (
                             <div className="mt-2 rounded-xl overflow-hidden border border-white/10">
-                              <img src={m.mediaUrl} alt="Attached Media" className="max-h-48 object-cover" />
+                              <img src={m.mediaUrl} alt="Attached Media" className="max-h-48 object-cover rounded-xl" />
+                            </div>
+                          )}
+
+                          {/* Audio Player for Voice Messages */}
+                          {m.mediaUrl && (m.messageType === 'AUDIO' || m.mediaUrl.includes('.mp4') || m.mediaUrl.includes('.aac') || m.mediaUrl.includes('.ogg') || m.mediaUrl.includes('.mp3') || m.mediaUrl.includes('.wav') || m.mediaUrl.includes('audioclip')) && (
+                            <div className="mt-2 bg-black/40 p-2.5 rounded-xl border border-white/10 space-y-1.5">
+                              <div className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-semibold">
+                                <Mic className="w-3.5 h-3.5" />
+                                <span>গ্রাহকের ভয়েস মেসেজ শুনুন:</span>
+                              </div>
+                              <audio controls src={m.mediaUrl} className="w-full h-8 rounded-lg" preload="metadata" />
                             </div>
                           )}
 
                           {/* Audio transcription if present */}
                           {m.transcription && (
-                            <div className="mt-2 bg-black/20 p-2 rounded-lg text-[11px] flex items-center gap-1.5">
-                              <Mic className="w-3.5 h-3.5 text-emerald-300" />
-                              <span>{m.transcription}</span>
+                            <div className="mt-2 bg-black/30 border border-emerald-500/20 p-2.5 rounded-xl text-[11px] space-y-0.5">
+                              <div className="flex items-center gap-1 text-[10px] text-emerald-300 font-semibold">
+                                <Mic className="w-3 h-3 text-emerald-400" />
+                                <span>ভয়েস রূপান্তর (Transcription):</span>
+                              </div>
+                              <p className="text-gray-200 italic font-medium">"{m.transcription}"</p>
                             </div>
                           )}
                         </div>
