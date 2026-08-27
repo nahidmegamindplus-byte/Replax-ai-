@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import AdminLayout from '@/components/layout/AdminLayout';
 import {
-  Cpu,
   Sparkles,
   Key,
   ShieldCheck,
@@ -14,6 +13,7 @@ import {
   Zap,
   Activity,
   AlertCircle,
+  Globe,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -23,17 +23,21 @@ export default function AdminAiSettingsPage() {
   const [saving, setSaving] = useState(false);
 
   // AI Configuration State
-  const [provider, setProvider] = useState<'DEEPSEEK' | 'GEMINI' | 'OPENAI'>('DEEPSEEK');
-  const [model, setModel] = useState('deepseek-chat');
+  const [provider, setProvider] = useState<'GOROUTER' | 'DEEPSEEK' | 'GEMINI' | 'OPENAI'>('GOROUTER');
+  const [model, setModel] = useState('deepseek/deepseek-chat');
+  const [customModel, setCustomModel] = useState('');
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(800);
 
-  // API Keys
+  // API Keys & Base URLs
+  const [gorouterKey, setGorouterKey] = useState('');
+  const [gorouterBaseUrl, setGorouterBaseUrl] = useState('https://openrouter.ai/api/v1');
   const [deepseekKey, setDeepseekKey] = useState('');
   const [geminiKey, setGeminiKey] = useState('');
   const [openaiKey, setOpenAIKey] = useState('');
 
   const [keyStatus, setKeyStatus] = useState({
+    gorouter: { hasKey: false, maskedKey: '', baseUrl: 'https://openrouter.ai/api/v1' },
     deepseek: { hasKey: false, maskedKey: '' },
     gemini: { hasKey: false, maskedKey: '' },
     openai: { hasKey: false, maskedKey: '' },
@@ -42,6 +46,7 @@ export default function AdminAiSettingsPage() {
   // Individual API Key Test States
   const [testingKey, setTestingKey] = useState<string | null>(null);
   const [keyTestResults, setKeyTestResults] = useState<{
+    gorouter?: { success: boolean; message: string };
     deepseek?: { success: boolean; message: string };
     gemini?: { success: boolean; message: string };
     openai?: { success: boolean; message: string };
@@ -52,7 +57,7 @@ export default function AdminAiSettingsPage() {
   const [chatLog, setChatLog] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
     {
       role: 'assistant',
-      text: 'আসসালামু আলাইকুম! আমি ReplyX AI। সিস্টেমের যেকোনো AI প্রোভাইডার ও মডেলের পারফরম্যান্স এখান থেকে টেস্ট করতে পারেন।',
+      text: 'আসসালামু আলাইকুম! আমি ReplyX AI। GoRouter, DeepSeek, Gemini বা OpenAI সহ যেকোনো মডেলের পারফরম্যান্স এখান থেকে টেস্ট করুন।',
     },
   ]);
   const [testingChat, setTestingChat] = useState(false);
@@ -64,11 +69,16 @@ export default function AdminAiSettingsPage() {
       const data = await res.json();
 
       if (data.success && data.settings) {
-        setProvider(data.settings.provider || 'DEEPSEEK');
-        setModel(data.settings.model || 'deepseek-chat');
+        const prov = (data.settings.provider || 'GOROUTER') as any;
+        setProvider(prov);
+        setModel(data.settings.model || (prov === 'GOROUTER' ? 'deepseek/deepseek-chat' : 'gemini-1.5-flash'));
         setTemperature(data.settings.temperature || 0.7);
         setMaxTokens(data.settings.maxTokens || 800);
+        if (data.settings.gorouter?.baseUrl) {
+          setGorouterBaseUrl(data.settings.gorouter.baseUrl);
+        }
         setKeyStatus({
+          gorouter: data.settings.gorouter || { hasKey: false, maskedKey: '', baseUrl: 'https://openrouter.ai/api/v1' },
           deepseek: data.settings.deepseek || { hasKey: false, maskedKey: '' },
           gemini: data.settings.gemini || { hasKey: false, maskedKey: '' },
           openai: data.settings.openai || { hasKey: false, maskedKey: '' },
@@ -85,9 +95,11 @@ export default function AdminAiSettingsPage() {
     fetchSettings();
   }, []);
 
-  const handleProviderChange = (newProvider: 'DEEPSEEK' | 'GEMINI' | 'OPENAI') => {
+  const handleProviderChange = (newProvider: 'GOROUTER' | 'DEEPSEEK' | 'GEMINI' | 'OPENAI') => {
     setProvider(newProvider);
-    if (newProvider === 'DEEPSEEK') {
+    if (newProvider === 'GOROUTER') {
+      setModel('deepseek/deepseek-chat');
+    } else if (newProvider === 'DEEPSEEK') {
       setModel('deepseek-chat');
     } else if (newProvider === 'OPENAI') {
       setModel('gpt-4o-mini');
@@ -97,12 +109,17 @@ export default function AdminAiSettingsPage() {
   };
 
   // Test an individual API Key Connection
-  const handleTestApiKey = async (targetProvider: 'DEEPSEEK' | 'GEMINI' | 'OPENAI', currentInputKey: string) => {
-    const keyKey = targetProvider.toLowerCase() as 'deepseek' | 'gemini' | 'openai';
+  const handleTestApiKey = async (
+    targetProvider: 'GOROUTER' | 'DEEPSEEK' | 'GEMINI' | 'OPENAI',
+    currentInputKey: string
+  ) => {
+    const keyKey = targetProvider.toLowerCase() as 'gorouter' | 'deepseek' | 'gemini' | 'openai';
     setTestingKey(targetProvider);
     setKeyTestResults((prev) => ({ ...prev, [keyKey]: undefined }));
 
     try {
+      const activeModel = model === 'CUSTOM' ? (customModel.trim() || 'deepseek/deepseek-chat') : model;
+
       const res = await fetch('/api/admin/ai-settings/test-key', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -110,7 +127,9 @@ export default function AdminAiSettingsPage() {
           provider: targetProvider,
           apiKey: currentInputKey || undefined,
           model:
-            targetProvider === 'DEEPSEEK'
+            targetProvider === 'GOROUTER'
+              ? activeModel
+              : targetProvider === 'DEEPSEEK'
               ? 'deepseek-chat'
               : targetProvider === 'OPENAI'
               ? 'gpt-4o-mini'
@@ -148,14 +167,18 @@ export default function AdminAiSettingsPage() {
     setSaving(true);
 
     try {
+      const activeModel = model === 'CUSTOM' ? customModel.trim() : model;
+
       const res = await fetch('/api/admin/ai-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           provider,
-          model,
+          model: activeModel,
           temperature,
           maxTokens,
+          gorouterKey: gorouterKey || undefined,
+          gorouterBaseUrl: gorouterBaseUrl || undefined,
           deepseekKey: deepseekKey || undefined,
           geminiKey: geminiKey || undefined,
           openaiKey: openaiKey || undefined,
@@ -165,6 +188,7 @@ export default function AdminAiSettingsPage() {
       const data = await res.json();
       if (data.success) {
         toast.success(data.message || 'AI সেটিংস সফলভাবে সংরক্ষিত হয়েছে!');
+        setGorouterKey('');
         setDeepseekKey('');
         setGeminiKey('');
         setOpenAIKey('');
@@ -226,7 +250,7 @@ export default function AdminAiSettingsPage() {
   return (
     <AdminLayout
       title="🤖 AI ও API Key সেটিংস"
-      subtitle="প্ল্যাটফর্মের সেন্ট্রাল AI ইঞ্জিন, DeepSeek, Google Gemini এবং OpenAI কনফিগারেশন ও লাইভ কানেকশন টেস্ট"
+      subtitle="প্ল্যাটফর্মের সেন্ট্রাল AI ইঞ্জিন, GoRouter / OpenRouter, DeepSeek, Google Gemini এবং OpenAI কনফিগারেশন"
     >
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Left: Configuration Form (7 cols) */}
@@ -255,26 +279,48 @@ export default function AdminAiSettingsPage() {
                 <label className="block text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2.5">
                   অ্যাক্টিভ AI প্রোভাইডার
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {/* GoRouter / OpenRouter Option */}
+                  <button
+                    type="button"
+                    onClick={() => handleProviderChange('GOROUTER')}
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
+                      provider === 'GOROUTER'
+                        ? 'bg-purple-600/20 border-purple-500 text-white font-bold shadow-lg shadow-purple-500/10 ring-1 ring-purple-500/50'
+                        : 'bg-[#0a0812] border-purple-900/30 text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-amber-300 flex items-center gap-1">
+                        <Globe className="w-3.5 h-3.5 text-amber-400" />
+                        <span>GoRouter</span>
+                      </span>
+                      {provider === 'GOROUTER' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
+                    </div>
+                    <p className="text-[10px] text-gray-400 font-normal leading-tight">
+                      All-in-one Router (DeepSeek, Claude, GPT, Llama)
+                    </p>
+                  </button>
+
                   {/* DeepSeek Option */}
                   <button
                     type="button"
                     onClick={() => handleProviderChange('DEEPSEEK')}
-                    className={`p-4 rounded-2xl border text-left transition-all ${
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
                       provider === 'DEEPSEEK'
                         ? 'bg-purple-600/20 border-purple-500 text-white font-bold shadow-lg shadow-purple-500/10'
                         : 'bg-[#0a0812] border-purple-900/30 text-gray-400 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-bold text-cyan-300 flex items-center gap-1.5">
-                        <Zap className="w-4 h-4 text-cyan-400" />
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-cyan-300 flex items-center gap-1">
+                        <Zap className="w-3.5 h-3.5 text-cyan-400" />
                         <span>DeepSeek</span>
                       </span>
-                      {provider === 'DEEPSEEK' && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
+                      {provider === 'DEEPSEEK' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
                     </div>
-                    <p className="text-[11px] text-gray-400 font-normal">
-                      সুপার ফাস্ট, সাশ্রয়ী ও বাংলা/ব্যাংলিশে পারদর্শী
+                    <p className="text-[10px] text-gray-400 font-normal leading-tight">
+                      সুপার ফাস্ট ও সাশ্রয়ী
                     </p>
                   </button>
 
@@ -282,18 +328,18 @@ export default function AdminAiSettingsPage() {
                   <button
                     type="button"
                     onClick={() => handleProviderChange('GEMINI')}
-                    className={`p-4 rounded-2xl border text-left transition-all ${
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
                       provider === 'GEMINI'
                         ? 'bg-purple-600/20 border-purple-500 text-white font-bold shadow-lg shadow-purple-500/10'
                         : 'bg-[#0a0812] border-purple-900/30 text-gray-400 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-bold text-emerald-300">Google Gemini</span>
-                      {provider === 'GEMINI' && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-emerald-300">Google Gemini</span>
+                      {provider === 'GEMINI' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
                     </div>
-                    <p className="text-[11px] text-gray-400 font-normal">
-                      মাল্টিমোডাল ভিশন ও ভয়েস সমর্থন
+                    <p className="text-[10px] text-gray-400 font-normal leading-tight">
+                      মাল্টিমোডাল ভিশন & ভয়েস
                     </p>
                   </button>
 
@@ -301,18 +347,18 @@ export default function AdminAiSettingsPage() {
                   <button
                     type="button"
                     onClick={() => handleProviderChange('OPENAI')}
-                    className={`p-4 rounded-2xl border text-left transition-all ${
+                    className={`p-3.5 rounded-2xl border text-left transition-all ${
                       provider === 'OPENAI'
                         ? 'bg-purple-600/20 border-purple-500 text-white font-bold shadow-lg shadow-purple-500/10'
                         : 'bg-[#0a0812] border-purple-900/30 text-gray-400 hover:text-white'
                     }`}
                   >
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-bold text-blue-300">OpenAI</span>
-                      {provider === 'OPENAI' && <CheckCircle2 className="w-4 h-4 text-purple-400" />}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs font-bold text-blue-300">OpenAI</span>
+                      {provider === 'OPENAI' && <CheckCircle2 className="w-3.5 h-3.5 text-purple-400" />}
                     </div>
-                    <p className="text-[11px] text-gray-400 font-normal">
-                      স্মার্ট ও নির্ভরযোগ্য মডেল (GPT-4o)
+                    <p className="text-[10px] text-gray-400 font-normal leading-tight">
+                      GPT-4o / GPT-4o-mini
                     </p>
                   </button>
                 </div>
@@ -328,7 +374,18 @@ export default function AdminAiSettingsPage() {
                   onChange={(e) => setModel(e.target.value)}
                   className="w-full px-3.5 py-2.5 bg-[#0a0812] border border-purple-900/40 rounded-xl text-white text-xs focus:outline-none focus:border-purple-500"
                 >
-                  {provider === 'DEEPSEEK' ? (
+                  {provider === 'GOROUTER' ? (
+                    <>
+                      <option value="deepseek/deepseek-chat">deepseek/deepseek-chat (DeepSeek V3 — রেকমেন্ডেড)</option>
+                      <option value="deepseek/deepseek-r1">deepseek/deepseek-r1 (DeepSeek R1 Reasoning)</option>
+                      <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (সুপার ফাস্ট)</option>
+                      <option value="openai/gpt-4o">openai/gpt-4o (হাই পারফরম্যান্স)</option>
+                      <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet (স্মার্ট ন্যাচারাল বাংলা)</option>
+                      <option value="meta-llama/llama-3.3-70b-instruct">meta-llama/llama-3.3-70b-instruct</option>
+                      <option value="google/gemini-2.0-flash-exp:free">google/gemini-2.0-flash-exp:free</option>
+                      <option value="CUSTOM">কাস্টম মডেল নাম লিখুন (Custom Model ID)...</option>
+                    </>
+                  ) : provider === 'DEEPSEEK' ? (
                     <>
                       <option value="deepseek-chat">deepseek-chat (DeepSeek-V3 — দ্রুত ও আদর্শ)</option>
                       <option value="deepseek-reasoner">deepseek-reasoner (DeepSeek-R1 — ডিপ রিজনিং)</option>
@@ -345,6 +402,84 @@ export default function AdminAiSettingsPage() {
                     </>
                   )}
                 </select>
+
+                {provider === 'GOROUTER' && model === 'CUSTOM' && (
+                  <input
+                    type="text"
+                    value={customModel}
+                    onChange={(e) => setCustomModel(e.target.value)}
+                    placeholder="যেমন: mistralai/mistral-large-2411 বা qwen/qwen-2.5-72b-instruct"
+                    className="w-full mt-2 px-3.5 py-2 bg-[#0a0812] border border-amber-500/40 rounded-xl text-white text-xs font-mono focus:outline-none focus:border-amber-400"
+                  />
+                )}
+              </div>
+
+              {/* GoRouter / OpenRouter API Key & Base URL Input */}
+              <div className="p-4 rounded-2xl bg-[#0a0812] border border-amber-500/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                    <Globe className="w-3.5 h-3.5" />
+                    <span>GoRouter / OpenRouter API Key (gorouter.app / openrouter.ai)</span>
+                  </label>
+                  {keyStatus.gorouter.hasKey && (
+                    <span className="text-[11px] text-emerald-400 font-mono">
+                      সংরক্ষিত: {keyStatus.gorouter.maskedKey}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex gap-2">
+                  <input
+                    type="password"
+                    value={gorouterKey}
+                    onChange={(e) => setGorouterKey(e.target.value)}
+                    placeholder={
+                      keyStatus.gorouter.hasKey
+                        ? 'নতুন GoRouter / OpenRouter Key দিতে চাইলে লিখুন...'
+                        : 'sk-or-v1-... (gorouter.app বা openrouter.ai থেকে সংগ্রহ করুন)'
+                    }
+                    className="flex-1 px-3.5 py-2 bg-[#140f24] border border-purple-900/40 rounded-xl text-white placeholder-gray-500 text-xs font-mono focus:outline-none focus:border-amber-400"
+                  />
+                  <button
+                    type="button"
+                    disabled={testingKey === 'GOROUTER'}
+                    onClick={() => handleTestApiKey('GOROUTER', gorouterKey)}
+                    className="px-3.5 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>{testingKey === 'GOROUTER' ? 'টেস্ট হচ্ছে...' : 'টেস্ট করুন'}</span>
+                  </button>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+                    API Base URL (Default: https://openrouter.ai/api/v1 অথবা https://gorouter.app/api/v1)
+                  </label>
+                  <input
+                    type="text"
+                    value={gorouterBaseUrl}
+                    onChange={(e) => setGorouterBaseUrl(e.target.value)}
+                    placeholder="https://openrouter.ai/api/v1"
+                    className="w-full px-3.5 py-1.5 bg-[#140f24] border border-purple-900/40 rounded-xl text-gray-300 text-xs font-mono focus:outline-none focus:border-amber-400"
+                  />
+                </div>
+
+                {keyTestResults.gorouter && (
+                  <div
+                    className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                      keyTestResults.gorouter.success
+                        ? 'bg-emerald-950/30 border border-emerald-500/40 text-emerald-300'
+                        : 'bg-red-950/30 border border-red-500/40 text-red-300'
+                    }`}
+                  >
+                    {keyTestResults.gorouter.success ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+                    )}
+                    <span>{keyTestResults.gorouter.message}</span>
+                  </div>
+                )}
               </div>
 
               {/* DeepSeek API Key Input & Live Test Button */}
@@ -352,7 +487,7 @@ export default function AdminAiSettingsPage() {
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-cyan-300 flex items-center gap-1.5">
                     <Key className="w-3.5 h-3.5" />
-                    <span>DeepSeek API Key</span>
+                    <span>DeepSeek Direct API Key</span>
                   </label>
                   {keyStatus.deepseek.hasKey && (
                     <span className="text-[11px] text-emerald-400 font-mono">

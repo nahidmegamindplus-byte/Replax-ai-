@@ -6,12 +6,6 @@ import {
   ShoppingCart,
   Search,
   Plus,
-  Filter,
-  CheckCircle2,
-  Clock,
-  Truck,
-  XCircle,
-  AlertCircle,
   Bot,
   User,
   Phone,
@@ -19,6 +13,14 @@ import {
   X,
   Trash2,
   Edit2,
+  Copy,
+  MessageCircle,
+  Eye,
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  Truck,
+  XCircle,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -41,12 +43,14 @@ export default function OrdersPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [selectedPageId, setSelectedPageId] = useState('ALL');
 
-  // Modal State
+  // Modal States
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedOrder, setSelectedOrder] = useState<any>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [saving, setSaving] = useState(false);
 
+  // Add Form State
   const [addForm, setAddForm] = useState({
     pageId: '',
     customerName: '',
@@ -55,6 +59,19 @@ export default function OrdersPage() {
     product: '',
     quantity: '1',
     price: '',
+    notes: '',
+    status: 'PENDING',
+  });
+
+  // Edit Form State
+  const [editForm, setEditForm] = useState({
+    id: '',
+    customerName: '',
+    phone: '',
+    address: '',
+    product: '',
+    quantity: '1',
+    totalPrice: '',
     notes: '',
     status: 'PENDING',
   });
@@ -76,10 +93,10 @@ export default function OrdersPage() {
       const pageData = await pageRes.json();
 
       if (orderData.success) {
-        setOrders(orderData.orders);
+        setOrders(orderData.orders || []);
         if (orderData.counts) setCounts(orderData.counts);
       }
-      if (pageData.success && pageData.pages.length > 0) {
+      if (pageData.success && pageData.pages?.length > 0) {
         setPages(pageData.pages);
         if (!addForm.pageId) {
           setAddForm((prev) => ({ ...prev, pageId: pageData.pages[0].id }));
@@ -95,6 +112,11 @@ export default function OrdersPage() {
   useEffect(() => {
     fetchOrders();
   }, [search, statusFilter, selectedPageId]);
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} কপি করা হয়েছে!`);
+  };
 
   const handleUpdateStatus = async (orderId: string, nextStatus: string) => {
     try {
@@ -118,8 +140,12 @@ export default function OrdersPage() {
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
+    if (!addForm.customerName.trim() || !addForm.phone.trim() || !addForm.address.trim()) {
+      toast.error('গ্রাহকের নাম, মোবাইল নম্বর এবং ঠিকানা পূরণ করুন।');
+      return;
+    }
 
+    setSaving(true);
     try {
       const qty = parseInt(addForm.quantity || '1', 10);
       const prc = parseFloat(addForm.price || '0');
@@ -161,6 +187,57 @@ export default function OrdersPage() {
     }
   };
 
+  const handleOpenEdit = (order: any) => {
+    setEditForm({
+      id: order.id,
+      customerName: order.customerName || '',
+      phone: order.phone || '',
+      address: order.address || '',
+      product: order.product || '',
+      quantity: order.quantity ? order.quantity.toString() : '1',
+      totalPrice: order.totalPrice ? order.totalPrice.toString() : '0',
+      notes: order.notes || '',
+      status: order.status || 'PENDING',
+    });
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editForm.id) return;
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/orders/${editForm.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: editForm.customerName.trim(),
+          phone: editForm.phone.trim(),
+          address: editForm.address.trim(),
+          product: editForm.product.trim(),
+          quantity: parseInt(editForm.quantity || '1', 10),
+          totalPrice: parseFloat(editForm.totalPrice || '0'),
+          notes: editForm.notes.trim() || null,
+          status: editForm.status,
+        }),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        toast.success('অর্ডার সফলভাবে আপডেট হয়েছে!');
+        setShowEditModal(false);
+        fetchOrders();
+      } else {
+        toast.error(data.error || 'আপডেট ব্যর্থ হয়েছে।');
+      }
+    } catch (e) {
+      toast.error('সার্ভার ত্রুটি।');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleDeleteOrder = async (id: string) => {
     if (!confirm('আপনি কি এই অর্ডারটি মুছে ফেলতে চান?')) return;
 
@@ -180,7 +257,7 @@ export default function OrdersPage() {
   return (
     <DashboardLayout
       title="অর্ডার ম্যানেজমেন্ট"
-      subtitle="AI ও মেসেঞ্জার থেকে ক্যাপচার করা সমস্ত অর্ডার মনিটর ও স্ট্যাটাস পরিবর্তন করুন"
+      subtitle="AI ও মেসেঞ্জার থেকে ক্যাপচার করা সমস্ত কাস্টমার অর্ডার মনিটর, এডিট ও পরিচালনা করুন"
     >
       {/* Top Status Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
@@ -197,7 +274,7 @@ export default function OrdersPage() {
             onClick={() => setStatusFilter(tab.id)}
             className={`p-3.5 rounded-2xl border text-left transition-all ${
               statusFilter === tab.id
-                ? 'bg-[#161a29] border-emerald-500/40 shadow-lg'
+                ? 'bg-[#161a29] border-emerald-500/40 shadow-lg ring-1 ring-emerald-500/30'
                 : 'bg-[#12141c] border-[#1f2433] hover:border-[#2b354d]'
             }`}
           >
@@ -236,6 +313,14 @@ export default function OrdersPage() {
               </option>
             ))}
           </select>
+
+          <button
+            onClick={fetchOrders}
+            className="p-2 rounded-xl bg-[#12141c] border border-[#1f2433] text-gray-400 hover:text-white transition-colors"
+            title="রিফ্রেশ করুন"
+          >
+            <RefreshCw className="w-4 h-4" />
+          </button>
         </div>
 
         <button
@@ -272,7 +357,7 @@ export default function OrdersPage() {
             <table className="w-full text-left text-xs text-gray-300">
               <thead className="bg-[#0d0f17] text-gray-400 border-b border-[#1f2433] uppercase text-[10px] tracking-wider">
                 <tr>
-                  <th className="py-3.5 px-4 font-semibold">অর্ডার নং</th>
+                  <th className="py-3.5 px-4 font-semibold">অর্ডার নং ও পেজ</th>
                   <th className="py-3.5 px-4 font-semibold">গ্রাহক ও ফোন</th>
                   <th className="py-3.5 px-4 font-semibold">পণ্য ও পরিমাণ</th>
                   <th className="py-3.5 px-4 font-semibold">মূল্য</th>
@@ -285,20 +370,40 @@ export default function OrdersPage() {
               <tbody className="divide-y divide-[#1a1f2e]">
                 {orders.map((o) => (
                   <tr key={o.id} className="hover:bg-[#161a29]/60 transition-colors">
-                    <td className="py-3.5 px-4 font-mono font-bold text-emerald-400">
-                      #{o.id.slice(0, 8)}
+                    <td className="py-3.5 px-4">
+                      <div className="font-mono font-bold text-emerald-400">#{o.id.slice(0, 8)}</div>
+                      <div className="text-[10px] text-gray-400 truncate max-w-[120px]">
+                        {o.page?.pageName || 'Facebook Page'}
+                      </div>
                     </td>
+
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-white">{o.customerName}</div>
-                      <div className="text-[11px] text-gray-400 font-mono">{o.phone}</div>
+                      <div className="text-[11px] text-gray-400 font-mono flex items-center gap-1.5 mt-0.5">
+                        <span>{o.phone}</span>
+                        {o.phone && (
+                          <a
+                            href={`https://wa.me/${o.phone.replace(/[^\d]/g, '').replace(/^01/, '8801')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-0.5 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/40"
+                            title="WhatsApp চ্যাট"
+                          >
+                            <MessageCircle className="w-3 h-3" />
+                          </a>
+                        )}
+                      </div>
                     </td>
+
                     <td className="py-3.5 px-4">
                       <div className="font-medium text-gray-200">{o.product}</div>
                       <div className="text-[11px] text-gray-500">{o.quantity} টি</div>
                     </td>
+
                     <td className="py-3.5 px-4 font-bold text-white font-mono">
                       {o.totalPrice} ৳
                     </td>
+
                     <td className="py-3.5 px-4">
                       {o.source === 'MESSENGER_AI' ? (
                         <span className="px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold border border-emerald-500/20 inline-flex items-center gap-1">
@@ -310,6 +415,7 @@ export default function OrdersPage() {
                         </span>
                       )}
                     </td>
+
                     <td className="py-3.5 px-4">
                       <select
                         value={o.status}
@@ -333,6 +439,7 @@ export default function OrdersPage() {
                         <option value="CANCELLED" className="bg-[#12141c] text-white">বাতিল (Cancelled)</option>
                       </select>
                     </td>
+
                     <td className="py-3.5 px-4 text-gray-500 text-[11px]">
                       {new Date(o.createdAt).toLocaleDateString([], {
                         month: 'short',
@@ -341,16 +448,36 @@ export default function OrdersPage() {
                         minute: '2-digit',
                       })}
                     </td>
+
                     <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => {
-                          setSelectedOrder(o);
-                          setShowDetailModal(true);
-                        }}
-                        className="px-2.5 py-1 rounded-lg bg-[#1a1f2e] hover:bg-[#252c40] text-gray-300 text-xs font-semibold transition-colors"
-                      >
-                        বিস্তারিত
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          onClick={() => {
+                            setSelectedOrder(o);
+                            setShowDetailModal(true);
+                          }}
+                          className="p-1.5 rounded-lg bg-[#1a1f2e] hover:bg-emerald-500/20 text-gray-300 hover:text-emerald-300 transition-colors"
+                          title="বিস্তারিত দেখুন"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenEdit(o)}
+                          className="p-1.5 rounded-lg bg-[#1a1f2e] hover:bg-cyan-500/20 text-gray-300 hover:text-cyan-300 transition-colors"
+                          title="সম্পাদনা করুন"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteOrder(o.id)}
+                          className="p-1.5 rounded-lg bg-[#1a1f2e] hover:bg-red-500/20 text-gray-400 hover:text-red-400 transition-colors"
+                          title="মুছে ফেলুন"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -362,7 +489,7 @@ export default function OrdersPage() {
 
       {/* Order Detail Modal */}
       {showDetailModal && selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
           <div className="bg-[#12141c] border border-[#1f2433] rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative my-8">
             <button
               onClick={() => setShowDetailModal(false)}
@@ -379,12 +506,35 @@ export default function OrdersPage() {
             <h3 className="text-lg font-bold text-white mb-6">{selectedOrder.customerName}</h3>
 
             <div className="space-y-4 text-xs bg-[#0a0c13] p-4 rounded-2xl border border-[#1e2538] mb-6">
-              <div className="flex items-start gap-2.5">
-                <Phone className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                <div>
-                  <span className="text-gray-400 block text-[11px]">মোবাইল নম্বর:</span>
-                  <span className="text-white font-mono text-sm font-semibold">{selectedOrder.phone}</span>
+              <div className="flex items-start justify-between gap-2.5">
+                <div className="flex items-start gap-2.5">
+                  <Phone className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="text-gray-400 block text-[11px]">মোবাইল নম্বর:</span>
+                    <span className="text-white font-mono text-sm font-semibold">{selectedOrder.phone}</span>
+                  </div>
                 </div>
+
+                {selectedOrder.phone && (
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => handleCopy(selectedOrder.phone, 'ফোন নম্বর')}
+                      className="p-1.5 rounded-lg bg-[#1a1f2e] text-gray-400 hover:text-white"
+                      title="কপি করুন"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                    <a
+                      href={`https://wa.me/${selectedOrder.phone.replace(/[^\d]/g, '').replace(/^01/, '8801')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-xs font-bold"
+                    >
+                      <MessageCircle className="w-3.5 h-3.5" />
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-start gap-2.5">
@@ -420,20 +570,157 @@ export default function OrdersPage() {
                 মুছে ফেলুন
               </button>
 
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="px-5 py-2 rounded-xl bg-[#1a1f2e] text-gray-200 text-xs font-semibold hover:bg-[#252c40]"
-              >
-                বন্ধ করুন
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const target = selectedOrder;
+                    setShowDetailModal(false);
+                    handleOpenEdit(target);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold transition-colors"
+                >
+                  এডিট করুন
+                </button>
+                <button
+                  onClick={() => setShowDetailModal(false)}
+                  className="px-5 py-2 rounded-xl bg-[#1a1f2e] text-gray-200 text-xs font-semibold hover:bg-[#252c40]"
+                >
+                  বন্ধ করুন
+                </button>
+              </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Order Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-[#12141c] border border-[#1f2433] rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative my-8">
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="absolute top-5 right-5 text-gray-400 hover:text-white p-1 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-base font-bold text-white mb-1">অর্ডার তথ্য সম্পাদনা (Edit Order)</h3>
+            <p className="text-xs text-gray-400 mb-6">#{editForm.id.slice(0, 8)}</p>
+
+            <form onSubmit={handleSaveEdit} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">গ্রাহকের নাম *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.customerName}
+                  onChange={(e) => setEditForm({ ...editForm, customerName: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">মোবাইল ফোন নম্বর *</label>
+                <input
+                  type="tel"
+                  required
+                  value={editForm.phone}
+                  onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">ডেলিভারির পূর্ণ ঠিকানা *</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={editForm.address}
+                  onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">পণ্য (Product) *</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.product}
+                  onChange={(e) => setEditForm({ ...editForm, product: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">পরিমাণ</label>
+                  <input
+                    type="number"
+                    value={editForm.quantity}
+                    onChange={(e) => setEditForm({ ...editForm, quantity: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">মোট মূল্য (৳)</label>
+                  <input
+                    type="number"
+                    value={editForm.totalPrice}
+                    onChange={(e) => setEditForm({ ...editForm, totalPrice: e.target.value })}
+                    className="w-full px-3 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-300 mb-1">স্ট্যাটাস</label>
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="w-full px-2 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                  >
+                    <option value="PENDING">PENDING</option>
+                    <option value="CONFIRMED">CONFIRMED</option>
+                    <option value="PROCESSING">PROCESSING</option>
+                    <option value="DELIVERED">DELIVERED</option>
+                    <option value="CANCELLED">CANCELLED</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-300 mb-1">নোট / বিশেষ নির্দেশনা</label>
+                <textarea
+                  rows={2}
+                  value={editForm.notes}
+                  onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                  className="w-full px-3.5 py-2 bg-[#0a0c13] border border-[#1e2538] rounded-xl text-white text-xs focus:outline-none focus:border-emerald-500"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-[#1e2538]">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 rounded-xl bg-[#1a1f2e] text-gray-300 text-xs font-semibold"
+                >
+                  বাতিল
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/20 disabled:opacity-50"
+                >
+                  {saving ? 'সংরক্ষণ হচ্ছে...' : 'পরিবর্তন সংরক্ষণ করুন'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
       {/* Add Manual Order Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
           <div className="bg-[#12141c] border border-[#1f2433] rounded-3xl max-w-lg w-full p-6 sm:p-8 shadow-2xl relative my-8">
             <button
               onClick={() => setShowAddModal(false)}

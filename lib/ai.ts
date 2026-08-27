@@ -114,6 +114,8 @@ export async function getAdminAiSettings() {
         in: [
           'ADMIN_AI_PROVIDER',
           'ADMIN_AI_MODEL',
+          'ADMIN_GOROUTER_KEY_ENCRYPTED',
+          'ADMIN_GOROUTER_BASE_URL',
           'ADMIN_DEEPSEEK_KEY_ENCRYPTED',
           'ADMIN_GEMINI_KEY_ENCRYPTED',
           'ADMIN_OPENAI_KEY_ENCRYPTED',
@@ -130,6 +132,11 @@ export async function getAdminAiSettings() {
   });
 
   const provider = (map.ADMIN_AI_PROVIDER || process.env.AI_PROVIDER || 'GEMINI').toUpperCase();
+  const gorouterKey = map.ADMIN_GOROUTER_KEY_ENCRYPTED
+    ? decrypt(map.ADMIN_GOROUTER_KEY_ENCRYPTED)
+    : process.env.GOROUTER_API_KEY || process.env.OPENROUTER_API_KEY || '';
+  const gorouterBaseUrl = map.ADMIN_GOROUTER_BASE_URL || process.env.GOROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
+
   const deepseekKey = map.ADMIN_DEEPSEEK_KEY_ENCRYPTED
     ? decrypt(map.ADMIN_DEEPSEEK_KEY_ENCRYPTED)
     : process.env.DEEPSEEK_API_KEY || '';
@@ -142,7 +149,8 @@ export async function getAdminAiSettings() {
 
   let model = map.ADMIN_AI_MODEL || '';
   if (!model) {
-    if (provider === 'DEEPSEEK') model = 'deepseek-chat';
+    if (provider === 'GOROUTER' || provider === 'OPENROUTER') model = 'deepseek/deepseek-chat';
+    else if (provider === 'DEEPSEEK') model = 'deepseek-chat';
     else if (provider === 'OPENAI') model = 'gpt-4o-mini';
     else model = 'gemini-1.5-flash';
   }
@@ -153,6 +161,8 @@ export async function getAdminAiSettings() {
   return {
     provider,
     model,
+    gorouterKey,
+    gorouterBaseUrl,
     deepseekKey,
     geminiKey,
     openaiKey,
@@ -205,7 +215,9 @@ export async function generateAIReply(params: GenerateReplyParams): Promise<AIRe
 
   const provider = adminAi.provider;
   let apiKey = '';
-  if (provider === 'DEEPSEEK') {
+  if (provider === 'GOROUTER' || provider === 'OPENROUTER') {
+    apiKey = adminAi.gorouterKey;
+  } else if (provider === 'DEEPSEEK') {
     apiKey = adminAi.deepseekKey;
   } else if (provider === 'OPENAI') {
     apiKey = adminAi.openaiKey;
@@ -273,9 +285,52 @@ If phone or address is missing, politely ask the customer for their mobile numbe
 
   let replyText = '';
 
-  // 2. Dispatch to the configured AI Provider (DEEPSEEK / GEMINI / OPENAI)
+  // 2. Dispatch to the configured AI Provider (GOROUTER / DEEPSEEK / GEMINI / OPENAI)
   try {
-    if (provider === 'DEEPSEEK') {
+    if (provider === 'GOROUTER' || provider === 'OPENROUTER') {
+      // -------------------------------------------------------------
+      // GOROUTER / OPENROUTER Provider (gorouter.app / openrouter.ai)
+      // -------------------------------------------------------------
+      if (!apiKey) {
+        throw new Error('GoRouter / OpenRouter API Key is not configured in Admin Panel.');
+      }
+
+      const gorouter = new OpenAI({
+        apiKey,
+        baseURL: adminAi.gorouterBaseUrl || 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': 'https://replax-ai.vercel.app',
+          'X-Title': 'ReplyX AI',
+        },
+      });
+
+      const messagesForGoRouter: any[] = [
+        { role: 'system', content: systemPrompt },
+      ];
+
+      for (const msg of conversationHistory.slice(-6)) {
+        messagesForGoRouter.push({
+          role: msg.direction === 'INCOMING' ? 'user' : 'assistant',
+          content: msg.text,
+        });
+      }
+
+      let userQuery = incomingText;
+      if (transcription) userQuery += `\n[Customer Voice Transcription]: ${transcription}`;
+      if (incomingImageUrl) userQuery += `\n[Customer sent an image]: ${incomingImageUrl}`;
+
+      messagesForGoRouter.push({ role: 'user', content: userQuery || 'Hello' });
+
+      const completion = await gorouter.chat.completions.create({
+        model: modelName || 'deepseek/deepseek-chat',
+        messages: messagesForGoRouter,
+        temperature: adminAi.temperature,
+        max_tokens: adminAi.maxTokens,
+      });
+
+      replyText = completion.choices[0]?.message?.content || '';
+
+    } else if (provider === 'DEEPSEEK') {
       // -------------------------------------------------------------
       // DEEPSEEK Provider (OpenAI Compatible API at api.deepseek.com)
       // -------------------------------------------------------------

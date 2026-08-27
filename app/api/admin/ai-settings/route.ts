@@ -15,6 +15,8 @@ export async function GET(req: NextRequest) {
           in: [
             'ADMIN_AI_PROVIDER',
             'ADMIN_AI_MODEL',
+            'ADMIN_GOROUTER_KEY_ENCRYPTED',
+            'ADMIN_GOROUTER_BASE_URL',
             'ADMIN_DEEPSEEK_KEY_ENCRYPTED',
             'ADMIN_GEMINI_KEY_ENCRYPTED',
             'ADMIN_OPENAI_KEY_ENCRYPTED',
@@ -31,7 +33,10 @@ export async function GET(req: NextRequest) {
     });
 
     const provider = (map.ADMIN_AI_PROVIDER || process.env.AI_PROVIDER || 'GEMINI').toUpperCase();
-    const model = map.ADMIN_AI_MODEL || (provider === 'DEEPSEEK' ? 'deepseek-chat' : provider === 'OPENAI' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
+    const model = map.ADMIN_AI_MODEL || (provider === 'GOROUTER' || provider === 'OPENROUTER' ? 'deepseek/deepseek-chat' : provider === 'DEEPSEEK' ? 'deepseek-chat' : provider === 'OPENAI' ? 'gpt-4o-mini' : 'gemini-1.5-flash');
+
+    const gorouterKeyRaw = map.ADMIN_GOROUTER_KEY_ENCRYPTED ? decrypt(map.ADMIN_GOROUTER_KEY_ENCRYPTED) : (process.env.GOROUTER_API_KEY || process.env.OPENROUTER_API_KEY || '');
+    const gorouterBaseUrl = map.ADMIN_GOROUTER_BASE_URL || process.env.GOROUTER_BASE_URL || 'https://openrouter.ai/api/v1';
 
     const deepseekKeyRaw = map.ADMIN_DEEPSEEK_KEY_ENCRYPTED ? decrypt(map.ADMIN_DEEPSEEK_KEY_ENCRYPTED) : (process.env.DEEPSEEK_API_KEY || '');
     const geminiKeyRaw = map.ADMIN_GEMINI_KEY_ENCRYPTED ? decrypt(map.ADMIN_GEMINI_KEY_ENCRYPTED) : (process.env.GEMINI_API_KEY || '');
@@ -44,6 +49,11 @@ export async function GET(req: NextRequest) {
         model,
         temperature: map.ADMIN_AI_TEMPERATURE ? parseFloat(map.ADMIN_AI_TEMPERATURE) : 0.7,
         maxTokens: map.ADMIN_AI_MAX_TOKENS ? parseInt(map.ADMIN_AI_MAX_TOKENS, 10) : 800,
+        gorouter: {
+          hasKey: Boolean(gorouterKeyRaw),
+          maskedKey: gorouterKeyRaw ? maskToken(gorouterKeyRaw) : '',
+          baseUrl: gorouterBaseUrl,
+        },
         deepseek: {
           hasKey: Boolean(deepseekKeyRaw),
           maskedKey: deepseekKeyRaw ? maskToken(deepseekKeyRaw) : '',
@@ -75,6 +85,8 @@ export async function POST(req: NextRequest) {
       model,
       temperature,
       maxTokens,
+      gorouterKey,
+      gorouterBaseUrl,
       deepseekKey,
       geminiKey,
       openaiKey,
@@ -88,6 +100,9 @@ export async function POST(req: NextRequest) {
     if (model) {
       updates.push({ key: 'ADMIN_AI_MODEL', value: model });
     }
+    if (gorouterBaseUrl) {
+      updates.push({ key: 'ADMIN_GOROUTER_BASE_URL', value: gorouterBaseUrl.trim() });
+    }
     if (temperature !== undefined) {
       updates.push({ key: 'ADMIN_AI_TEMPERATURE', value: String(temperature) });
     }
@@ -95,6 +110,12 @@ export async function POST(req: NextRequest) {
       updates.push({ key: 'ADMIN_AI_MAX_TOKENS', value: String(maxTokens) });
     }
 
+    if (gorouterKey && gorouterKey.trim()) {
+      updates.push({
+        key: 'ADMIN_GOROUTER_KEY_ENCRYPTED',
+        value: encrypt(gorouterKey.trim()),
+      });
+    }
     if (deepseekKey && deepseekKey.trim()) {
       updates.push({
         key: 'ADMIN_DEEPSEEK_KEY_ENCRYPTED',

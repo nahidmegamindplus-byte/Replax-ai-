@@ -22,7 +22,9 @@ export async function POST(req: NextRequest) {
     // If key not sent in body, fetch saved encrypted key from DB
     if (!keyToTest) {
       const settingKey =
-        provider.toUpperCase() === 'DEEPSEEK'
+        provider.toUpperCase() === 'GOROUTER' || provider.toUpperCase() === 'OPENROUTER'
+          ? 'ADMIN_GOROUTER_KEY_ENCRYPTED'
+          : provider.toUpperCase() === 'DEEPSEEK'
           ? 'ADMIN_DEEPSEEK_KEY_ENCRYPTED'
           : provider.toUpperCase() === 'OPENAI'
           ? 'ADMIN_OPENAI_KEY_ENCRYPTED'
@@ -36,7 +38,9 @@ export async function POST(req: NextRequest) {
         keyToTest = decrypt(setting.value);
       } else {
         keyToTest =
-          provider.toUpperCase() === 'DEEPSEEK'
+          provider.toUpperCase() === 'GOROUTER' || provider.toUpperCase() === 'OPENROUTER'
+            ? process.env.GOROUTER_API_KEY || process.env.OPENROUTER_API_KEY || ''
+            : provider.toUpperCase() === 'DEEPSEEK'
             ? process.env.DEEPSEEK_API_KEY || ''
             : provider.toUpperCase() === 'OPENAI'
             ? process.env.OPENAI_API_KEY || ''
@@ -53,7 +57,38 @@ export async function POST(req: NextRequest) {
 
     const startTime = Date.now();
 
-    if (provider.toUpperCase() === 'DEEPSEEK') {
+    if (provider.toUpperCase() === 'GOROUTER' || provider.toUpperCase() === 'OPENROUTER') {
+      const baseUrlSetting = await prisma.systemSetting.findUnique({
+        where: { key: 'ADMIN_GOROUTER_BASE_URL' },
+      });
+      const baseURL = baseUrlSetting?.value || 'https://openrouter.ai/api/v1';
+
+      const client = new OpenAI({
+        apiKey: keyToTest,
+        baseURL,
+        defaultHeaders: {
+          'HTTP-Referer': 'https://replax-ai.vercel.app',
+          'X-Title': 'ReplyX AI',
+        },
+      });
+
+      const res = await client.chat.completions.create({
+        model: model || 'deepseek/deepseek-chat',
+        messages: [{ role: 'user', content: 'Say "OK"' }],
+        max_tokens: 5,
+      });
+
+      const latencyMs = Date.now() - startTime;
+      const text = res.choices[0]?.message?.content || '';
+
+      return NextResponse.json({
+        success: true,
+        provider: 'GOROUTER',
+        latencyMs,
+        message: `✅ GoRouter / OpenRouter (${model || 'deepseek/deepseek-chat'}) কানেকশন সফল! (${latencyMs}ms)`,
+        reply: text.trim(),
+      });
+    } else if (provider.toUpperCase() === 'DEEPSEEK') {
       const client = new OpenAI({
         apiKey: keyToTest,
         baseURL: 'https://api.deepseek.com',
