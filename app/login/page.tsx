@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Sparkles, Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Sparkles, Mail, Lock, ArrowRight, AlertCircle, Eye, EyeOff, Key } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
-export default function LoginPage() {
+function LoginFormContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const toast = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,7 +37,7 @@ export default function LoginPage() {
       }
 
       toast.success('সফলভাবে লগইন হয়েছে!');
-      const redirectParam = searchParams.get('redirect');
+      const redirectParam = searchParams ? searchParams.get('redirect') : null;
       if (redirectParam) {
         router.push(redirectParam);
       } else if (data.user?.role === 'ADMIN') {
@@ -75,6 +76,23 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-[#12141c] border border-[#1f2433] rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+          {/* Quick License Access Banner */}
+          <div className="mb-5 p-3.5 rounded-xl bg-gradient-to-r from-purple-950/40 via-indigo-950/40 to-cyan-950/40 border border-purple-500/40 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="text-lg">🔑</span>
+              <div>
+                <p className="text-xs font-bold text-white">লাইসেন্স কি আছে?</p>
+                <p className="text-[10px] text-purple-300">রেজিস্ট্রেশন ছাড়া সরাসরি প্রবেশ করুন</p>
+              </div>
+            </div>
+            <Link
+              href="/activate"
+              className="px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow transition-all shrink-0"
+            >
+              কি অ্যাক্টিভেট করুন
+            </Link>
+          </div>
+
           {errorMsg && (
             <div className="mb-5 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 flex items-start gap-2.5 text-red-300 text-sm">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
@@ -167,5 +185,19 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#090a0f] flex items-center justify-center text-white">
+          <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+        </div>
+      }
+    >
+      <LoginFormContent />
+    </Suspense>
   );
 }

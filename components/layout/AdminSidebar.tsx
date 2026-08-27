@@ -18,6 +18,7 @@ import {
   Package as PackageIcon,
   CreditCard,
   FileCheck2,
+  Key,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -50,6 +51,7 @@ export default function AdminSidebar({ user, isOpenMobile, onCloseMobile }: Admi
 
   const navItems = [
     { href: '/admin', label: 'অ্যাডমিন ড্যাশবোর্ড', icon: ShieldAlert },
+    { href: '/admin/licenses', label: '🔑 লাইসেন্স কি জেনারেটর', icon: Key },
     { href: '/admin/package-orders', label: 'প্যাকেজ অর্ডার ও ভেরিফিকেশন', icon: FileCheck2 },
     { href: '/admin/packages', label: 'প্যাকেজসমূহ (Packages)', icon: PackageIcon },
     { href: '/admin/payment-methods', label: 'পেমেন্ট মেথডস (bKash/Nagad)', icon: CreditCard },

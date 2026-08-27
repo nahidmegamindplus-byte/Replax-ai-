@@ -235,6 +235,28 @@ export async function ensureDatabaseReady() {
           "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
       `);
+
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "LicenseKey" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "key" TEXT NOT NULL UNIQUE,
+          "plan" TEXT NOT NULL DEFAULT 'STARTER',
+          "packageId" TEXT,
+          "durationDays" INTEGER NOT NULL DEFAULT 30,
+          "messageLimit" INTEGER NOT NULL DEFAULT 1000,
+          "pageLimit" INTEGER NOT NULL DEFAULT 1,
+          "productLimit" INTEGER NOT NULL DEFAULT 50,
+          "clientName" TEXT,
+          "clientPhone" TEXT,
+          "clientNote" TEXT,
+          "status" TEXT NOT NULL DEFAULT 'ACTIVE',
+          "usedByUserId" TEXT,
+          "usedAt" DATETIME,
+          "expiresAt" DATETIME,
+          "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+      `);
     } catch (ddlErr) {
       console.warn('Raw table creation error:', ddlErr);
     }

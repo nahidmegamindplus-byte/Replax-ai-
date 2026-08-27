@@ -37,6 +37,7 @@ model User {
   orders        Order[]
   aiSettings    AiSetting[]
   activityLogs  ActivityLog[]
+  licenseKeys   LicenseKey[]
 
   @@index([email])
   @@index([role])
@@ -247,6 +248,7 @@ model Package {
 
   orders          PackageOrder[]
   users           User[]
+  licenseKeys     LicenseKey[]
 
   @@index([slug])
   @@index([isActive])
@@ -295,5 +297,32 @@ model PackageOrder {
   @@index([status])
   @@index([transactionId])
   @@index([orderNumber])
+}
+
+model LicenseKey {
+  id              String         @id @default(uuid())
+  key             String         @unique // RPLX-BIZ-8942-1204
+  plan            String         @default("STARTER") // STARTER, BUSINESS, PRO
+  packageId       String?
+  durationDays    Int            @default(30)
+  messageLimit    Int            @default(1000)
+  pageLimit       Int            @default(1)
+  productLimit    Int            @default(50)
+  clientName      String?
+  clientPhone     String?
+  clientNote      String?
+  status          String         @default("ACTIVE") // ACTIVE, USED, EXPIRED, REVOKED
+  usedByUserId    String?
+  usedAt          DateTime?
+  expiresAt       DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  package         Package?       @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  usedByUser      User?          @relation(fields: [usedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([key])
+  @@index([status])
+  @@index([usedByUserId])
 }
 
