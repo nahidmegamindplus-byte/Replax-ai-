@@ -65,3 +65,100 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function POST(req: NextRequest) {
+  const auth = await requireAdmin(req);
+  if ('response' in auth) return auth.response;
+
+  try {
+    const body = await req.json();
+    const {
+      userId,
+      packageId,
+      paymentMethodName,
+      amount,
+      senderNumber,
+      transactionId,
+      status = 'PENDING',
+      adminNote,
+    } = body;
+
+    if (!userId || !packageId || !transactionId || !senderNumber) {
+      return NextResponse.json(
+        { success: false, error: 'ইউজার, প্যাকেজ, প্রেরকের নম্বর এবং Transaction ID আবশ্যক।' },
+        { status: 400 }
+      );
+    }
+
+    const pkg = await prisma.package.findUnique({ where: { id: packageId } });
+    if (!pkg) {
+      return NextResponse.json({ success: false, error: 'প্যাকেজটি পাওয়া যায়নি।' }, { status: 404 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return NextResponse.json({ success: false, error: 'ব্যবহারকারীকে পাওয়া যায়নি।' }, { status: 404 });
+    }
+
+    const orderNumber = `ORD-${Date.now().toString().slice(-6)}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const finalAmount = amount !== undefined && amount !== null && amount !== '' ? parseFloat(amount) : pkg.price;
+    const finalMethod = paymentMethodName || 'bKash (Manual)';
+
+    const isApproved = status === 'APPROVED';
+
+    const order = await prisma.packageOrder.create({
+      data: {
+        orderNumber,
+        userId,
+        packageId,
+        paymentMethodName: finalMethod,
+        amount: finalAmount,
+        senderNumber: senderNumber.trim(),
+        transactionId: transactionId.trim(),
+        status: status || 'PENDING',
+        adminNote: adminNote ? adminNote.trim() : null,
+        approvedAt: isApproved ? new Date() : null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            fullName: true,
+            businessName: true,
+            email: true,
+          },
+        },
+        package: true,
+      },
+    });
+
+    if (isApproved) {
+      const durationDays = pkg.durationDays || 30;
+      const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
+
+      await prisma.user.update({
+        where: { id: userId },
+        data: {
+          planStatus: 'ACTIVE',
+          plan: pkg.slug.toUpperCase(),
+          activePackageId: pkg.id,
+          monthlyMessageLimit: pkg.messageLimit,
+          planExpiresAt: expiresAt,
+        },
+      });
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `ম্যানুয়াল অর্ডার ${orderNumber} সফলভাবে তৈরি করা হয়েছে!`,
+      order,
+    });
+  } catch (error: any) {
+    console.error('Error creating manual package order:', error);
+    return NextResponse.json(
+      { success: false, error: 'ম্যানুয়াল অর্ডার তৈরি করতে সমস্যা হয়েছে।' },
+      { status: 500 }
+    );
+  }
+}
+
