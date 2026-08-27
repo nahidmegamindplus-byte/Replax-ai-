@@ -5,41 +5,18 @@ import path from 'path';
 function getDatabaseUrl(): string {
   const envUrl = process.env.DATABASE_URL;
 
-  // On Render / Docker / Serverless environments
-  const isServerlessOrDocker =
-    process.env.RENDER ||
-    process.env.NETLIFY ||
-    process.env.VERCEL ||
-    process.env.AWS_LAMBDA_FUNCTION_NAME ||
-    process.env.NODE_ENV === 'production';
-
-  // If explicit non-relative DATABASE_URL is set in Render settings (e.g. Postgres or /var/data/dev.db)
-  if (envUrl && !envUrl.startsWith('file:.')) {
-    return envUrl;
-  }
-
-  if (isServerlessOrDocker) {
-    const tmpDir = '/tmp';
-    if (fs.existsSync(tmpDir)) {
-      const targetDbPath = path.join(tmpDir, 'replyx_dev.db');
-      const seedDbPath = path.join(process.cwd(), 'prisma', 'dev.db');
-
-      if (!fs.existsSync(targetDbPath) && fs.existsSync(seedDbPath)) {
-        try {
-          fs.copyFileSync(seedDbPath, targetDbPath);
-        } catch (e) {
-          console.error('Failed to copy dev.db to /tmp:', e);
-        }
-      }
-      return `file:${targetDbPath}`;
+  if (envUrl && envUrl.trim() !== '') {
+    // If it's a relative file URL like "file:./dev.db" or "file:dev.db", resolve to absolute path
+    if (envUrl.startsWith('file:./') || envUrl.startsWith('file:dev.db') || envUrl.startsWith('file:prisma/')) {
+      const cleanPath = envUrl.replace(/^file:(\.\/)?(prisma\/)?/, '');
+      const resolved = path.resolve(process.cwd(), 'prisma', cleanPath);
+      return `file:${resolved}`;
     }
-  }
-
-  if (envUrl) {
     return envUrl;
   }
 
-  const localDb = path.join(process.cwd(), 'prisma', 'dev.db');
+  // Fallback to local prisma/dev.db
+  const localDb = path.resolve(process.cwd(), 'prisma', 'dev.db');
   return `file:${localDb}`;
 }
 

@@ -21,10 +21,8 @@ import {
   Package as PackageIcon,
   CreditCard,
   User as UserIcon,
-  DollarSign,
-  AlertCircle,
-  ExternalLink,
   ShieldCheck,
+  AlertCircle,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -51,16 +49,15 @@ export default function AdminPackageOrdersPage() {
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [viewingOrder, setViewingOrder] = useState<any>(null);
   const [rejectOrder, setRejectOrder] = useState<any>(null);
-  const [deletingOrderId, setDeletingOrderId] = useState<string | null>(null);
 
   // Form State for Add / Edit
   const [formUserId, setFormUserId] = useState('');
   const [formPackageId, setFormPackageId] = useState('');
-  const [formPaymentMethodName, setFormPaymentMethodName] = useState('bKash (Personal)');
+  const [formPaymentMethodName, setFormPaymentMethodName] = useState('bKash');
   const [formAmount, setFormAmount] = useState('');
   const [formSenderNumber, setFormSenderNumber] = useState('');
   const [formTransactionId, setFormTransactionId] = useState('');
-  const [formStatus, setFormStatus] = useState('PENDING');
+  const [formStatus, setFormStatus] = useState('APPROVED');
   const [formAdminNote, setFormAdminNote] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -123,11 +120,11 @@ export default function AdminPackageOrdersPage() {
     setFormUserId(usersList.length > 0 ? usersList[0].id : '');
     setFormPackageId(packagesList.length > 0 ? packagesList[0].id : '');
     setFormAmount(packagesList.length > 0 ? packagesList[0].price.toString() : '990');
-    setFormPaymentMethodName(paymentMethodsList.length > 0 ? paymentMethodsList[0].displayName : 'bKash (Personal)');
+    setFormPaymentMethodName(paymentMethodsList.length > 0 ? paymentMethodsList[0].displayName : 'bKash');
     setFormSenderNumber('');
     setFormTransactionId('');
     setFormStatus('APPROVED');
-    setFormAdminNote('অ্যাডমিন ম্যানুয়াল অর্ডার তৈরি করা হয়েছে।');
+    setFormAdminNote('অ্যাডমিন দ্বারা ম্যানুয়াল অর্ডার তৈরি করা হয়েছে।');
     setIsAddModalOpen(true);
   };
 
@@ -188,7 +185,7 @@ export default function AdminPackageOrdersPage() {
           paymentMethodName: formPaymentMethodName,
           amount: parseFloat(formAmount || '0'),
           senderNumber: formSenderNumber.trim(),
-          transactionId: formTransactionId.trim(),
+          transactionId: formTransactionId.trim().toUpperCase(),
           status: formStatus,
           adminNote: formAdminNote.trim(),
         }),
@@ -278,7 +275,6 @@ export default function AdminPackageOrdersPage() {
       const data = await res.json();
       if (data.success) {
         toast.success(data.message || 'অর্ডার সফলভাবে রিমুভ করা হয়েছে!');
-        setDeletingOrderId(null);
         fetchOrders();
       } else {
         toast.error(data.error || 'অর্ডার মুছতে ব্যর্থ হয়েছে।');

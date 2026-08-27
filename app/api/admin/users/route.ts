@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { userId, fullName, businessName, facebookPageUrl, phone, status, role, plan, password } = body;
+    const { userId, fullName, businessName, facebookPageUrl, phone, status, role, plan, planStatus, password } = body;
 
     if (!userId) {
       return NextResponse.json(
@@ -70,6 +70,7 @@ export async function PATCH(req: NextRequest) {
     if (status !== undefined) updateData.status = status;
     if (role !== undefined) updateData.role = role;
     if (plan !== undefined) updateData.plan = plan;
+    if (planStatus !== undefined) updateData.planStatus = planStatus;
 
     let passwordChanged = false;
     if (password && typeof password === 'string' && password.trim().length > 0) {
