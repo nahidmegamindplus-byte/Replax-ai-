@@ -167,7 +167,8 @@ function CheckoutContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           packageId: selectedPackage.id,
-          paymentMethodName: selectedMethod.name,
+          paymentMethodId: selectedMethod.id,
+          paymentMethodName: selectedMethod.displayName || selectedMethod.name,
           senderNumber: senderNumber.trim(),
           transactionId: transactionId.trim().toUpperCase(),
         }),

@@ -73,13 +73,22 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       adminNote,
     } = body;
 
-    const targetPackageId = packageId || existingOrder.packageId;
     const targetUserId = userId || existingOrder.userId;
+    const targetPackageId = packageId || existingOrder.packageId;
 
-    // Fetch package details if package changed
-    const pkg = await prisma.package.findUnique({ where: { id: targetPackageId } });
+    // Fetch package details or fallback safely
+    let pkg = await prisma.package.findFirst({
+      where: {
+        OR: [
+          { id: targetPackageId },
+          { slug: targetPackageId?.toLowerCase() },
+          { name: targetPackageId },
+        ],
+      },
+    });
+
     if (!pkg) {
-      return NextResponse.json({ success: false, error: 'নির্বাচিত প্যাকেজটি পাওয়া যায়নি।' }, { status: 400 });
+      pkg = existingOrder.package || (await prisma.package.findFirst());
     }
 
     const newStatus = status || existingOrder.status;
@@ -89,11 +98,11 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       where: { id },
       data: {
         userId: targetUserId,
-        packageId: targetPackageId,
+        packageId: pkg ? pkg.id : existingOrder.packageId,
         paymentMethodName: paymentMethodName !== undefined ? paymentMethodName : existingOrder.paymentMethodName,
         amount: amount !== undefined ? parseFloat(amount) : existingOrder.amount,
         senderNumber: senderNumber !== undefined ? senderNumber.trim() : existingOrder.senderNumber,
-        transactionId: transactionId !== undefined ? transactionId.trim() : existingOrder.transactionId,
+        transactionId: transactionId !== undefined ? transactionId.trim().toUpperCase() : existingOrder.transactionId,
         status: newStatus,
         adminNote: adminNote !== undefined ? adminNote.trim() : existingOrder.adminNote,
         approvedAt: newStatus === 'APPROVED' ? (existingOrder.approvedAt || new Date()) : null,
@@ -111,8 +120,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       },
     });
 
-    // If status changed to APPROVED, activate package & plan for user
-    if (newStatus === 'APPROVED') {
+    // If status is APPROVED, activate user's plan
+    if (newStatus === 'APPROVED' && pkg) {
       const durationDays = pkg.durationDays || 30;
       const expiresAt = new Date(Date.now() + durationDays * 24 * 60 * 60 * 1000);
 
@@ -127,7 +136,6 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         },
       });
     } else if (newStatus === 'REJECTED' && existingOrder.status === 'APPROVED') {
-      // Deactivate user if revoked
       await prisma.user.update({
         where: { id: targetUserId },
         data: {
@@ -139,7 +147,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     await logActivity({
       userId: auth.user.id,
       action: 'PACKAGE_ORDER_UPDATED',
-      description: `অর্ডার ${updatedOrder.orderNumber} সম্পাদনা করা হয়েছে (${newStatus})`,
+      description: `অর্ডার ${updatedOrder.orderNumber} আপডেট করা হয়েছে (${newStatus})`,
     });
 
     return NextResponse.json({
@@ -150,7 +158,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   } catch (error: any) {
     console.error('Error updating package order:', error);
     return NextResponse.json(
-      { success: false, error: 'অর্ডার আপডেট করতে সমস্যা হয়েছে।' },
+      { success: false, error: error?.message || 'অর্ডার আপডেট করতে সমস্যা হয়েছে।' },
       { status: 500 }
     );
   }

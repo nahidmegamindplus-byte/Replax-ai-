@@ -20,9 +20,6 @@ import {
   RefreshCw,
   Package as PackageIcon,
   CreditCard,
-  User as UserIcon,
-  ShieldCheck,
-  AlertCircle,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -36,7 +33,7 @@ export default function AdminPackageOrdersPage() {
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [search, setSearch] = useState('');
 
-  // Dropdown option sources (Users, Packages, Payment Methods)
+  // Dropdown option sources
   const [usersList, setUsersList] = useState<any[]>([]);
   const [packagesList, setPackagesList] = useState<any[]>([]);
   const [paymentMethodsList, setPaymentMethodsList] = useState<any[]>([]);
@@ -53,7 +50,7 @@ export default function AdminPackageOrdersPage() {
   // Form State for Add / Edit
   const [formUserId, setFormUserId] = useState('');
   const [formPackageId, setFormPackageId] = useState('');
-  const [formPaymentMethodName, setFormPaymentMethodName] = useState('bKash');
+  const [formPaymentMethodName, setFormPaymentMethodName] = useState('bKash (Personal)');
   const [formAmount, setFormAmount] = useState('');
   const [formSenderNumber, setFormSenderNumber] = useState('');
   const [formTransactionId, setFormTransactionId] = useState('');
@@ -120,7 +117,7 @@ export default function AdminPackageOrdersPage() {
     setFormUserId(usersList.length > 0 ? usersList[0].id : '');
     setFormPackageId(packagesList.length > 0 ? packagesList[0].id : '');
     setFormAmount(packagesList.length > 0 ? packagesList[0].price.toString() : '990');
-    setFormPaymentMethodName(paymentMethodsList.length > 0 ? paymentMethodsList[0].displayName : 'bKash');
+    setFormPaymentMethodName(paymentMethodsList.length > 0 ? paymentMethodsList[0].displayName : 'bKash (Personal)');
     setFormSenderNumber('');
     setFormTransactionId('');
     setFormStatus('APPROVED');
@@ -134,7 +131,7 @@ export default function AdminPackageOrdersPage() {
     setFormUserId(order.userId || '');
     setFormPackageId(order.packageId || '');
     setFormAmount(order.amount ? order.amount.toString() : '0');
-    setFormPaymentMethodName(order.paymentMethodName || 'bKash');
+    setFormPaymentMethodName(order.paymentMethodName || 'bKash (Personal)');
     setFormSenderNumber(order.senderNumber || '');
     setFormTransactionId(order.transactionId || '');
     setFormStatus(order.status || 'PENDING');
@@ -209,7 +206,7 @@ export default function AdminPackageOrdersPage() {
 
   // Approve Action
   const handleApprove = async (orderId: string, orderNumber: string) => {
-    if (!confirm(`আপনি কি "${orderNumber}" অর্ডারটি অনুমোদন করতে চান? এটি ব্যবহারকারীর প্যাকেজ সক্রিয় করবে।`)) return;
+    if (!confirm(`আপনি কি "${orderNumber}" অর্ডারটি অনুমোদন করতে চান? এটি ব্যবহারকারীর অ্যাকাউন্ট ও প্যাকেজ তাৎক্ষণিক সক্রিয় করবে।`)) return;
 
     setProcessingId(orderId);
     try {
@@ -357,7 +354,7 @@ export default function AdminPackageOrdersPage() {
           onClick={() => setStatusFilter('ALL')}
           className={`p-4 rounded-2xl border text-left transition-all ${
             statusFilter === 'ALL'
-              ? 'bg-purple-600/20 border-purple-500 text-white font-bold'
+              ? 'bg-purple-600/20 border-purple-500 text-white font-bold shadow-lg'
               : 'bg-[#120e20] border-purple-900/30 text-gray-400 hover:text-white'
           }`}
         >
@@ -370,7 +367,7 @@ export default function AdminPackageOrdersPage() {
           onClick={() => setStatusFilter('PENDING')}
           className={`p-4 rounded-2xl border text-left transition-all ${
             statusFilter === 'PENDING'
-              ? 'bg-amber-500/20 border-amber-500 text-white font-bold'
+              ? 'bg-amber-500/20 border-amber-500 text-white font-bold shadow-lg'
               : 'bg-[#120e20] border-purple-900/30 text-gray-400 hover:text-white'
           }`}
         >
@@ -388,7 +385,7 @@ export default function AdminPackageOrdersPage() {
           onClick={() => setStatusFilter('APPROVED')}
           className={`p-4 rounded-2xl border text-left transition-all ${
             statusFilter === 'APPROVED'
-              ? 'bg-emerald-500/20 border-emerald-500 text-white font-bold'
+              ? 'bg-emerald-500/20 border-emerald-500 text-white font-bold shadow-lg'
               : 'bg-[#120e20] border-purple-900/30 text-gray-400 hover:text-white'
           }`}
         >
@@ -401,7 +398,7 @@ export default function AdminPackageOrdersPage() {
           onClick={() => setStatusFilter('REJECTED')}
           className={`p-4 rounded-2xl border text-left transition-all ${
             statusFilter === 'REJECTED'
-              ? 'bg-red-500/20 border-red-500 text-white font-bold'
+              ? 'bg-red-500/20 border-red-500 text-white font-bold shadow-lg'
               : 'bg-[#120e20] border-purple-900/30 text-gray-400 hover:text-white'
           }`}
         >
@@ -483,7 +480,7 @@ export default function AdminPackageOrdersPage() {
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-white">{o.package?.name}</div>
+                        <div className="font-semibold text-white">{o.package?.name || 'Package'}</div>
                         <div className="text-[11px] font-mono text-emerald-400 font-bold">৳ {o.amount}</div>
                       </td>
 
@@ -896,7 +893,7 @@ export default function AdminPackageOrdersPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <span className="text-gray-400">প্যাকেজ:</span>
-                    <p className="font-bold text-purple-300">{viewingOrder.package?.name}</p>
+                    <p className="font-bold text-purple-300">{viewingOrder.package?.name || 'Package'}</p>
                   </div>
                   <div>
                     <span className="text-gray-400">পরিশোধিত মূল্য:</span>
