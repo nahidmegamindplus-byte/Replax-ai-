@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { requireAdmin } from '@/lib/auth';
+import { requireAdmin, hashPassword } from '@/lib/auth';
 import { logActivity } from '@/lib/logger';
 
 export async function GET(req: NextRequest) {
@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { userId, fullName, businessName, facebookPageUrl, phone, status, role, plan } = body;
+    const { userId, fullName, businessName, facebookPageUrl, phone, status, role, plan, password } = body;
 
     if (!userId) {
       return NextResponse.json(
@@ -71,6 +71,18 @@ export async function PATCH(req: NextRequest) {
     if (role !== undefined) updateData.role = role;
     if (plan !== undefined) updateData.plan = plan;
 
+    let passwordChanged = false;
+    if (password && typeof password === 'string' && password.trim().length > 0) {
+      if (password.trim().length < 6) {
+        return NextResponse.json(
+          { success: false, error: 'নতুন পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।' },
+          { status: 400 }
+        );
+      }
+      updateData.passwordHash = await hashPassword(password.trim());
+      passwordChanged = true;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: updateData,
@@ -78,13 +90,17 @@ export async function PATCH(req: NextRequest) {
 
     await logActivity({
       userId: adminAuth.user.id,
-      action: 'ADMIN_USER_UPDATED',
-      description: `অ্যাডমিন দ্বারা ব্যবহারকারী ${updatedUser.email}-এর তথ্য আপডেট করা হয়েছে (${status || role || plan})`,
+      action: passwordChanged ? 'ADMIN_USER_PASSWORD_RESET' : 'ADMIN_USER_UPDATED',
+      description: passwordChanged
+        ? `অ্যাডমিন দ্বারা ব্যবহারকারী ${updatedUser.email}-এর পাসওয়ার্ড রিসেট করা হয়েছে`
+        : `অ্যাডমিন দ্বারা ব্যবহারকারী ${updatedUser.email}-এর তথ্য আপডেট করা হয়েছে (${status || role || plan})`,
     });
 
     return NextResponse.json({
       success: true,
-      message: 'ব্যবহারকারীর তথ্য সফলভাবে আপডেট হয়েছে!',
+      message: passwordChanged
+        ? 'ব্যবহারকারীর পাসওয়ার্ড ও তথ্য সফলভাবে আপডেট হয়েছে!'
+        : 'ব্যবহারকারীর তথ্য সফলভাবে আপডেট হয়েছে!',
       user: updatedUser,
     });
   } catch (error: any) {

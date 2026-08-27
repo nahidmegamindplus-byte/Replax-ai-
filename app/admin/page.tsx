@@ -193,6 +193,22 @@ export default function AdminDashboardPage() {
                 </Link>
 
                 <Link
+                  href="/admin/settings"
+                  className="flex items-center justify-between p-4 rounded-2xl bg-[#120e20] border border-emerald-500/30 hover:border-emerald-500/60 hover:bg-[#131d24] transition-all group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center font-bold">
+                      💬
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-white group-hover:text-emerald-300">WhatsApp সাপোর্ট নম্বর ও সেটিংস</h4>
+                      <p className="text-[11px] text-gray-400">লাইভ চ্যাট বাটন নম্বর, মেসেজ ও পজিশন পরিবর্তন</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-4 h-4 text-gray-500 group-hover:text-emerald-400 transition-transform group-hover:translate-x-1" />
+                </Link>
+
+                <Link
                   href="/admin/pages"
                   className="flex items-center justify-between p-4 rounded-2xl bg-[#120e20] border border-purple-900/30 hover:border-purple-500/50 hover:bg-[#18122c] transition-all group"
                 >

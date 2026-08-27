@@ -18,6 +18,10 @@ import {
   X,
   Phone,
   Building,
+  Key,
+  Eye,
+  EyeOff,
+  MessageCircle,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -36,6 +40,8 @@ export default function AdminUsersPage() {
   const [role, setRole] = useState('USER');
   const [status, setStatus] = useState('ACTIVE');
   const [plan, setPlan] = useState('STARTER');
+  const [newPassword, setNewPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const fetchUsers = async () => {
@@ -68,6 +74,8 @@ export default function AdminUsersPage() {
     setRole(user.role || 'USER');
     setStatus(user.status || 'ACTIVE');
     setPlan(user.plan || 'STARTER');
+    setNewPassword('');
+    setShowNewPassword(false);
   };
 
   const handleSaveUser = async (e: React.FormEvent) => {
@@ -88,6 +96,7 @@ export default function AdminUsersPage() {
           role,
           status,
           plan,
+          password: newPassword ? newPassword.trim() : undefined,
         }),
       });
 
@@ -206,7 +215,21 @@ export default function AdminUsersPage() {
                     <td className="py-3.5 px-4">
                       <div className="font-semibold text-white">{u.fullName}</div>
                       <div className="text-[11px] text-gray-400 font-mono">{u.email}</div>
-                      {u.phone && <div className="text-[10px] text-gray-500 font-mono">{u.phone}</div>}
+                      {u.phone && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                          <span className="text-[10px] text-gray-400 font-mono">{u.phone}</span>
+                          <a
+                            href={`https://wa.me/${u.phone.replace(/[^\d]/g, '').replace(/^01/, '8801')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 text-[9px] font-bold"
+                            title="WhatsApp এ কথা বলুন"
+                          >
+                            <MessageCircle className="w-2.5 h-2.5" />
+                            <span>WhatsApp</span>
+                          </a>
+                        </div>
+                      )}
                     </td>
 
                     <td className="py-3.5 px-4">
@@ -285,9 +308,16 @@ export default function AdminUsersPage() {
                         <button
                           onClick={() => handleOpenEdit(u)}
                           className="p-1.5 rounded-lg bg-[#1a1f2e] hover:bg-purple-500/20 text-gray-300 hover:text-purple-300 transition-colors"
-                          title="সম্পাদনা করুন"
+                          title="সম্পাদনা ও পাসওয়ার্ড সেট করুন"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenEdit(u)}
+                          className="p-1.5 rounded-lg bg-[#1a1f2e] hover:bg-amber-500/20 text-gray-300 hover:text-amber-300 transition-colors"
+                          title="পাসওয়ার্ড রিসেট করুন"
+                        >
+                          <Key className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteUser(u.id, u.email)}
@@ -362,14 +392,43 @@ export default function AdminUsersPage() {
 
               <div>
                 <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-                  মোবাইল নম্বর
+                  মোবাইল / WhatsApp নম্বর (Mobile/WhatsApp Number)
                 </label>
                 <input
                   type="text"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
+                  placeholder="যেমন: +8801700000000"
                   className="w-full px-3.5 py-2 bg-[#090b14] border border-[#1f2433] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-purple-500"
                 />
+              </div>
+
+              {/* Set New Password for User */}
+              <div className="p-3.5 rounded-2xl bg-[#090b14] border border-purple-900/30">
+                <label className="block text-xs font-bold text-purple-300 uppercase tracking-wider mb-1 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Key className="w-3.5 h-3.5 text-purple-400" />
+                    <span>নতুন পাসওয়ার্ড সেট করুন (Set New Password)</span>
+                  </span>
+                  <span className="text-[10px] text-gray-500 font-normal">পরিবর্তন করতে চাইলে লিখুন</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? 'text' : 'password'}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="নতুন পাসওয়ার্ড (কমপক্ষে ৬ অক্ষর)..."
+                    className="w-full pl-3.5 pr-10 py-2 bg-[#12141c] border border-[#1f2433] rounded-xl text-white text-xs font-mono focus:outline-none focus:border-purple-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-1"
+                    title={showNewPassword ? 'পাসওয়ার্ড লুকান' : 'পাসওয়ার্ড দেখুন'}
+                  >
+                    {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
