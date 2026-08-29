@@ -61,3 +61,39 @@ body {
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Chat & Inbox isolated scrolling container */
+.chat-scroll-container {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+.chat-scroll-instant {
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Slim chat scrollbar */
+.chat-scroll-container::-webkit-scrollbar,
+.chat-scroll-instant::-webkit-scrollbar {
+  width: 5px;
+}
+
+.chat-scroll-container::-webkit-scrollbar-track,
+.chat-scroll-instant::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.chat-scroll-container::-webkit-scrollbar-thumb,
+.chat-scroll-instant::-webkit-scrollbar-thumb {
+  background: #1f2738;
+  border-radius: 9999px;
+}
+
+.chat-scroll-container::-webkit-scrollbar-thumb:hover,
+.chat-scroll-instant::-webkit-scrollbar-thumb:hover {
+  background: #323d57;
+}

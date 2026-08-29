@@ -272,6 +272,12 @@ export async function POST(req: NextRequest) {
                 where: { id: savedIncomingMessage.id },
                 data: { transcription: aiResult.transcription },
               });
+              await prisma.conversation.update({
+                where: { id: conversation.id },
+                data: {
+                  lastMessage: `🎙️ "${aiResult.transcription.length > 35 ? aiResult.transcription.slice(0, 35) + '...' : aiResult.transcription}"`,
+                },
+              });
             } catch (trErr) {}
           }
 

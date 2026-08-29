@@ -108,15 +108,17 @@ export interface AIResponseResult {
 /**
  * Safely fetch media attachment (image / voice audio) and convert to base64
  */
-async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg'): Promise<{ base64: string; mimeType: string } | null> {
+async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg'): Promise<{ base64: string; mimeType: string; buffer: Buffer } | null> {
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     const res = await fetch(url, {
       signal: controller.signal,
+      redirect: 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': '*/*',
       },
     });
     clearTimeout(timeoutId);
@@ -128,11 +130,22 @@ async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg
 
     const rawMime = res.headers.get('content-type') || defaultMime;
     let cleanMime = rawMime.split(';')[0].trim().toLowerCase();
+    const lowerUrl = url.toLowerCase();
 
-    // Map common audio types from Facebook Messenger CDN
-    if (cleanMime === 'application/octet-stream' || cleanMime === 'binary/octet-stream' || !cleanMime.startsWith('audio/')) {
-      const lowerUrl = url.toLowerCase();
-      if (lowerUrl.includes('.mp4') || lowerUrl.includes('audio_mp4') || defaultMime.includes('audio') || defaultMime.includes('mp4')) {
+    // Map common audio types from Facebook Messenger / WhatsApp CDN
+    if (
+      cleanMime === 'application/octet-stream' ||
+      cleanMime === 'binary/octet-stream' ||
+      cleanMime.startsWith('video/') ||
+      !cleanMime.startsWith('audio/')
+    ) {
+      if (
+        lowerUrl.includes('.mp4') ||
+        lowerUrl.includes('audio_mp4') ||
+        lowerUrl.includes('audioclip') ||
+        defaultMime.includes('audio') ||
+        defaultMime.includes('mp4')
+      ) {
         cleanMime = 'audio/mp4';
       } else if (lowerUrl.includes('.aac')) {
         cleanMime = 'audio/aac';
@@ -144,15 +157,25 @@ async function fetchMediaAsBase64(url: string, defaultMime: string = 'image/jpeg
         cleanMime = 'audio/wav';
       } else if (lowerUrl.includes('.m4a')) {
         cleanMime = 'audio/mp4';
-      } else {
+      } else if (defaultMime.startsWith('audio/')) {
         cleanMime = defaultMime;
       }
     }
 
-    const arrayBuffer = await res.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString('base64');
+    // Ensure Gemini-compatible audio MIME type
+    if (cleanMime === 'video/mp4' && defaultMime.startsWith('audio/')) {
+      cleanMime = 'audio/mp4';
+    } else if (cleanMime === 'audio/x-m4a' || cleanMime === 'audio/m4a') {
+      cleanMime = 'audio/mp4';
+    } else if (cleanMime === 'audio/opus') {
+      cleanMime = 'audio/ogg';
+    }
 
-    return { base64, mimeType: cleanMime };
+    const arrayBuffer = await res.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const base64 = buffer.toString('base64');
+
+    return { base64, mimeType: cleanMime, buffer };
   } catch (error: any) {
     serverLogger.warn(`Error fetching media asset from ${url}:`, error?.message);
     return null;
@@ -167,36 +190,120 @@ async function transcribeAudioWithGemini(
   mimeType: string,
   apiKey: string
 ): Promise<string | null> {
-  try {
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  if (!apiKey) return null;
 
-    const result = await model.generateContent([
-      {
-        inlineData: {
-          data: base64Audio,
-          mimeType: mimeType || 'audio/mp4',
+  // Gemini model fallback chain
+  const candidateModels = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-pro'];
+
+  for (const modelName of candidateModels) {
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: modelName });
+
+      // Gemini strictly requires supported audio MIME
+      let validGeminiMime = mimeType || 'audio/mp4';
+      if (validGeminiMime.startsWith('video/')) {
+        validGeminiMime = 'audio/mp4';
+      }
+
+      const result = await model.generateContent([
+        {
+          inlineData: {
+            data: base64Audio,
+            mimeType: validGeminiMime,
+          },
         },
+        `You are an ultra-accurate multilingual speech-to-text transcriber specializing in Bengali (বাংলা), all Bangladeshi dialects, Banglish, and English.
+The customer sent a voice note via Facebook Messenger / WhatsApp.
+
+Dialect & context coverage:
+- Standard Bengali, Sylheti (সিলেটি), Chittagonian/Chatgaiya (চাটগাঁইয়া), Noakhali (নোয়াখাইল্লা), Barisal (বরিশাইল্লা), Mymensingh, Rajshahi, Rangpur, and mixed Banglish.
+- E-commerce customer queries: price inquiry (দাম/প্রাইস কত), product inquiry (ছবি/কালার/সাইজ আছে?), delivery inquiry (ডেলিভারি চার্জ/কত দিনে পাবো?), cash on delivery (ক্যাশ অন ডেলিভারি), and placing orders (ফোন নম্বর, ঠিকানা, পণ্যের নাম).
+
+Strict instructions:
+1. Transcribe EXACTLY what the speaker said in clear, natural Bengali script (or English/Banglish if spoken in English/Banglish).
+2. Transcribe numbers, quantities, phone numbers, and addresses with high accuracy.
+3. If the audio is completely silent, blank, only background noise/music, inaudible whisper, or heavily corrupted/unintelligible, output EXACTLY: "[UNINTELLIGIBLE_AUDIO]".
+4. Output ONLY the raw transcribed text. Do NOT add any preamble, conversational commentary, or quotes.`,
+      ]);
+
+      const text = result.response.text()?.trim();
+      if (text) {
+        return text;
+      }
+    } catch (e: any) {
+      serverLogger.warn(`Gemini (${modelName}) Audio transcription attempt failed:`, e?.message);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Transcribe voice / audio message using OpenAI Whisper API
+ */
+async function transcribeAudioWithWhisper(
+  audioBuffer: Buffer,
+  mimeType: string,
+  apiKey: string
+): Promise<string | null> {
+  if (!apiKey) return null;
+
+  try {
+    const ext = mimeType.includes('mp4') ? 'mp4' : mimeType.includes('ogg') ? 'ogg' : mimeType.includes('aac') ? 'aac' : mimeType.includes('wav') ? 'wav' : 'mp3';
+    const blob = new Blob([new Uint8Array(audioBuffer)], { type: mimeType || 'audio/mp4' });
+    const formData = new FormData();
+    formData.append('file', blob, `audio.${ext}`);
+    formData.append('model', 'whisper-1');
+    formData.append('prompt', 'বাংলা এবং আঞ্চলিক ডায়ালেক্ট, পণ্যের দাম, অর্ডার, ফোন নম্বর ও ডেলিভারি');
+
+    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
       },
-      `You are a high-accuracy multilingual audio speech-to-text expert specializing in Bangladeshi dialects and colloquial speech.
-Listen to this voice message from a customer on Facebook Messenger / WhatsApp.
+      body: formData,
+    });
 
-Language / Dialect Context:
-- Standard Bengali (বাংলা), Regional dialects (Sylheti, Chittagonian/Chatgaiya, Noakhali, Barisal, Mymensingh, Rajshahi, Rangpur, etc.), Banglish, and English.
-- Customers commonly ask about: product prices, photos, delivery charges, stock availability, cash on delivery (COD), sizes (M, L, XL, XXL), colors, and order placement (giving phone numbers, addresses, names).
+    if (!res.ok) {
+      const errText = await res.text();
+      serverLogger.warn(`OpenAI Whisper transcription HTTP error (${res.status}): ${errText}`);
+      return null;
+    }
 
-Strict Rules:
-1. Transcribe EXACTLY what the customer said in natural Bengali (or English if they spoke English).
-2. If the audio is completely silent, blank, only background noise/music, inaudible whisper, or heavily distorted/corrupted, output EXACTLY: "[UNINTELLIGIBLE_AUDIO]".
-3. Do NOT add any preamble, quotes, explanations, or formatting. Output ONLY the raw transcribed words or "[UNINTELLIGIBLE_AUDIO]".`,
-    ]);
-
-    const text = result.response.text()?.trim();
+    const data = await res.json();
+    const text = data?.text?.trim();
     return text || null;
-  } catch (e: any) {
-    serverLogger.warn('Gemini Audio transcription failed:', e?.message);
+  } catch (err: any) {
+    serverLogger.warn('OpenAI Whisper transcription error:', err?.message);
     return null;
   }
+}
+
+/**
+ * Smart Audio Transcription Dispatcher that chooses the best available transcription engine
+ */
+async function transcribeAudio(
+  audioData: { base64: string; mimeType: string; buffer: Buffer },
+  adminAi: { geminiKey?: string; openaiKey?: string; gorouterKey?: string },
+  primaryApiKey?: string,
+  primaryProvider?: string
+): Promise<string | null> {
+  // 1. Try Gemini STT if Gemini key exists
+  const geminiKey = adminAi.geminiKey || (primaryProvider === 'GEMINI' ? primaryApiKey : '');
+  if (geminiKey) {
+    const text = await transcribeAudioWithGemini(audioData.base64, audioData.mimeType, geminiKey);
+    if (text) return text;
+  }
+
+  // 2. Try OpenAI Whisper STT if OpenAI key exists
+  const openaiKey = adminAi.openaiKey || (primaryProvider === 'OPENAI' ? primaryApiKey : '');
+  if (openaiKey) {
+    const text = await transcribeAudioWithWhisper(audioData.buffer, audioData.mimeType, openaiKey);
+    if (text) return text;
+  }
+
+  return null;
 }
 
 /**
@@ -411,8 +518,8 @@ If phone or address is missing, politely ask the customer for their mobile numbe
   let finalTranscription: string | null = initialTranscription || null;
 
   // 2. Pre-process Media Attachments (Image / Audio)
-  let imageData: { base64: string; mimeType: string } | null = null;
-  let audioData: { base64: string; mimeType: string } | null = null;
+  let imageData: { base64: string; mimeType: string; buffer: Buffer } | null = null;
+  let audioData: { base64: string; mimeType: string; buffer: Buffer } | null = null;
 
   if (incomingImageUrl && page.imageUnderstanding) {
     imageData = await fetchMediaAsBase64(incomingImageUrl, 'image/jpeg');
@@ -420,27 +527,21 @@ If phone or address is missing, politely ask the customer for their mobile numbe
 
   if (incomingAudioUrl && page.voiceProcessing) {
     audioData = await fetchMediaAsBase64(incomingAudioUrl, 'audio/mp4');
-    // Transcribe audio using Gemini Speech-to-Text
+    // Transcribe audio using multi-provider Speech-to-Text (Gemini or Whisper)
     if (audioData && !finalTranscription) {
-      const transcribeKey = adminAi.geminiKey || apiKey;
-      if (transcribeKey) {
-        finalTranscription = await transcribeAudioWithGemini(audioData.base64, audioData.mimeType, transcribeKey);
-      }
+      finalTranscription = await transcribeAudio(audioData, adminAi, apiKey, provider);
     }
   }
 
-  // Check if incoming message is an unintelligible voice note
-  const isUnintelligibleVoice =
+  // Check if voice note is explicitly unintelligible or download completely failed
+  const isExplicitlyUnintelligible =
     Boolean(incomingAudioUrl) &&
-    (!audioData ||
-      !finalTranscription ||
-      finalTranscription === '[UNINTELLIGIBLE_AUDIO]' ||
-      finalTranscription.trim() === '' ||
-      finalTranscription.trim() === '...' ||
-      finalTranscription.toLowerCase().includes('unintelligible'));
+    ((finalTranscription === '[UNINTELLIGIBLE_AUDIO]' ||
+      Boolean(finalTranscription && finalTranscription.toLowerCase().includes('unintelligible'))) ||
+      (!audioData && !finalTranscription));
 
-  // If customer sent a voice note that could not be clearly understood, NEVER guess or hallucinate
-  if (incomingAudioUrl && isUnintelligibleVoice) {
+  // If customer sent a voice note that could not be downloaded or was completely silent/unintelligible
+  if (incomingAudioUrl && isExplicitlyUnintelligible) {
     replyText = `সম্মানিত গ্রাহক, আপনার ভয়েস মেসেজটি স্পষ্টভাবে বোঝা যায়নি বা শোনা যায়নি। 😊\n\nঅনুগ্রহ করে ভয়েস মেসেজটি পুনরায় পাঠান অথবা আপনার প্রশ্নটি লিখে জানান, আমরা দ্রুত বিস্তারিত জানিয়ে সহায়তা করব!`;
     finalTranscription = finalTranscription === '[UNINTELLIGIBLE_AUDIO]' ? '(অস্পষ্ট বা নীরব ভয়েস)' : (finalTranscription || '(ভয়েস বোঝা যায়নি)');
 
