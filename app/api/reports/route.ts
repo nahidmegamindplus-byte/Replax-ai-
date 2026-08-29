@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     }
 
     // 1. Fetch total counts
-    const [messages, orders, pages, products] = await Promise.all([
+    const [messages, orders, pages, products, allTimeMessagesCount, allTimeIncomingCount, allTimeAiRepliesCount, allTimeConversationsCount, userRecord] = await Promise.all([
       prisma.message.findMany({
         where: baseWhere,
         select: {
@@ -75,8 +75,34 @@ export async function GET(req: NextRequest) {
         where: { userId: auth.user.id },
         select: { id: true, name: true, price: true, category: true },
       }),
+      prisma.message.count({
+        where: { userId: auth.user.id },
+      }),
+      prisma.message.count({
+        where: { userId: auth.user.id, direction: 'INCOMING' },
+      }),
+      prisma.message.count({
+        where: { userId: auth.user.id, aiGenerated: true },
+      }),
+      prisma.conversation.count({
+        where: { userId: auth.user.id },
+      }),
+      prisma.user.findUnique({
+        where: { id: auth.user.id },
+        select: {
+          messagesSentThisMonth: true,
+          monthlyMessageLimit: true,
+          activePackage: {
+            select: {
+              name: true,
+              messageLimit: true,
+            },
+          },
+        },
+      }),
     ]);
 
+    const totalMessages = messages.length;
     const totalIncoming = messages.filter((m) => m.direction === 'INCOMING').length;
     const totalAiReplies = messages.filter((m) => m.aiGenerated).length;
     const totalHumanReplies = messages.filter((m) => m.direction === 'OUTGOING' && !m.aiGenerated).length;
@@ -131,9 +157,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       metrics: {
+        totalMessages,
         totalIncoming,
         totalAiReplies,
         totalHumanReplies,
+        allTimeTotalMessages: allTimeMessagesCount,
+        allTimeIncoming: allTimeIncomingCount,
+        allTimeAiReplies: allTimeAiRepliesCount,
+        allTimeConversations: allTimeConversationsCount,
+        messagesSentThisMonth: userRecord?.messagesSentThisMonth || 0,
+        monthlyMessageLimit: userRecord?.activePackage?.messageLimit || userRecord?.monthlyMessageLimit || 0,
+        packageName: userRecord?.activePackage?.name || 'স্ট্যান্ডার্ড প্যাকেজ',
         totalOrders,
         confirmedOrders,
         totalRevenue,

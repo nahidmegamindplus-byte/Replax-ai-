@@ -16,6 +16,12 @@ import {
   Plus,
   ArrowRight,
   Sparkles,
+  Inbox,
+  UserCheck,
+  Send,
+  Zap,
+  BarChart2,
+  RefreshCw,
 } from 'lucide-react';
 import { useToast } from '@/components/ui/Toast';
 
@@ -23,11 +29,12 @@ export default function DashboardOverviewPage() {
   const toast = useToast();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<'today' | '7d' | '30d'>('today');
 
-  const fetchOverviewData = async () => {
+  const fetchOverviewData = async (range = timeRange) => {
     try {
       setLoading(true);
-      const res = await fetch('/api/reports?range=today');
+      const res = await fetch(`/api/reports?range=${range}`);
       const data = await res.json();
 
       if (data.success) {
@@ -41,84 +48,280 @@ export default function DashboardOverviewPage() {
   };
 
   useEffect(() => {
-    fetchOverviewData();
-  }, []);
+    fetchOverviewData(timeRange);
+  }, [timeRange]);
+
+  const metrics = stats?.metrics || {};
+  const monthlyUsed = metrics.messagesSentThisMonth || 0;
+  const monthlyLimit = metrics.monthlyMessageLimit || 0;
+  const usagePercent =
+    monthlyLimit > 0 ? Math.min(Math.round((monthlyUsed / monthlyLimit) * 100), 100) : 0;
 
   return (
     <DashboardLayout
       title="ওভারভিউ ড্যাশবোর্ড"
-      subtitle="আপনার Facebook Messenger AI অটোমেশনের রিয়েল-টাইম পরিসংখ্যান ও গতিবিধি"
+      subtitle="আপনার Facebook Messenger AI অটোমেশনের সর্বমোট মেসেজ সংখ্যা, রিয়েল-টাইম পরিসংখ্যান ও গতিবিধি"
     >
+      {/* Top Controls: Time Filter & Refresh */}
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+        <div>
+          <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+            <span>লাইভ অ্যানালিটিক্স ওভারভিউ</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          </h2>
+          <p className="text-xs text-gray-400">সকল পেজের মেসেজ ও অটোমেশন রিয়েল-টাইমে পর্যবেক্ষণ করুন</p>
+        </div>
+
+        <div className="flex items-center gap-2 bg-[#12141c] border border-[#1f2433] p-1 rounded-xl">
+          <button
+            onClick={() => setTimeRange('today')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              timeRange === 'today'
+                ? 'bg-emerald-500 text-black shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            আজকে
+          </button>
+          <button
+            onClick={() => setTimeRange('7d')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              timeRange === '7d'
+                ? 'bg-emerald-500 text-black shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            গত ৭ দিন
+          </button>
+          <button
+            onClick={() => setTimeRange('30d')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
+              timeRange === '30d'
+                ? 'bg-emerald-500 text-black shadow'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            গত ৩০ দিন
+          </button>
+          <button
+            onClick={() => fetchOverviewData(timeRange)}
+            title="রিফ্রেশ ডাটা"
+            className="p-1.5 rounded-lg text-gray-400 hover:text-white transition-colors"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-400' : ''}`} />
+          </button>
+        </div>
+      </div>
+
       {/* Top 4 Statistic Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-8">
-        {/* Card 1: Connected Pages */}
-        <div className="bg-[#12141c] border border-[#1f2433] rounded-2xl p-5 hover:border-emerald-500/30 transition-all">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 mb-6">
+        {/* Card 1: Total Messages (Combined / All-time & Range) */}
+        <div className="bg-gradient-to-b from-[#161a29] to-[#12141c] border border-cyan-500/30 rounded-2xl p-5 hover:border-cyan-500/50 transition-all shadow-lg relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-cyan-500/10 rounded-full blur-xl pointer-events-none"></div>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">সংযুক্ত পেজ সমূহ</span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <Layers className="w-5 h-5" />
+            <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
+              <MessageSquare className="w-3.5 h-3.5" /> মোট মেসেজ সংখ্যা
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center border border-cyan-500/30">
+              <Inbox className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white">
+              {loading ? '...' : (metrics.allTimeTotalMessages ?? metrics.totalMessages ?? 0).toLocaleString()}
+            </h3>
+            <span className="text-xs text-cyan-300 font-medium">টি সর্বমোট</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-gray-400 mt-2.5 pt-2 border-t border-[#1e2538]">
+            <span>
+              {timeRange === 'today' ? 'আজকে' : timeRange === '7d' ? '৭ দিনে' : '৩০ দিনে'}:{' '}
+              <strong className="text-gray-200">{(metrics.totalMessages ?? 0).toLocaleString()}</strong> টি
+            </span>
+            <span>
+              ইনকামিং: <strong className="text-emerald-400">{(metrics.totalIncoming ?? 0).toLocaleString()}</strong>
+            </span>
+          </div>
+        </div>
+
+        {/* Card 2: AI Replies */}
+        <div className="bg-gradient-to-b from-[#181528] to-[#12141c] border border-purple-500/30 rounded-2xl p-5 hover:border-purple-500/50 transition-all shadow-lg relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/10 rounded-full blur-xl pointer-events-none"></div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-purple-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Bot className="w-3.5 h-3.5" /> AI স্বয়ংক্রিয় রিপ্লাই
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center border border-purple-500/30">
+              <Zap className="w-4 h-4" />
+            </div>
+          </div>
+          <div className="flex items-baseline gap-2">
+            <h3 className="text-2xl sm:text-3xl font-extrabold text-white">
+              {loading ? '...' : (metrics.allTimeAiReplies ?? metrics.totalAiReplies ?? 0).toLocaleString()}
+            </h3>
+            <span className="text-xs text-purple-300 font-medium">টি মোট</span>
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-gray-400 mt-2.5 pt-2 border-t border-[#1e2538]">
+            <span>
+              {timeRange === 'today' ? 'আজকে' : 'সিলেক্টেড'}:{' '}
+              <strong className="text-gray-200">{(metrics.totalAiReplies ?? 0).toLocaleString()}</strong> টি
+            </span>
+            <span className="text-emerald-400 font-semibold">১.৮ সে. গড় গতি</span>
+          </div>
+        </div>
+
+        {/* Card 3: Connected Pages */}
+        <div className="bg-gradient-to-b from-[#131d20] to-[#12141c] border border-emerald-500/30 rounded-2xl p-5 hover:border-emerald-500/50 transition-all shadow-lg relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Layers className="w-3.5 h-3.5" /> সক্রিয় Facebook Page
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-300 flex items-center justify-center border border-emerald-500/30">
+              <Layers className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <h3 className="text-2xl sm:text-3xl font-extrabold text-white">
               {loading ? '...' : stats?.pagesBreakdown?.length || 0}
             </h3>
-            <span className="text-xs text-emerald-400 font-medium">টি সক্রিয়</span>
+            <span className="text-xs text-emerald-300 font-medium">টি পেজ সংযুক্ত</span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-2">সকল পেজে মেসেঞ্জার অটোমেশন সক্রিয়</p>
+          <div className="flex items-center justify-between text-[11px] text-gray-400 mt-2.5 pt-2 border-t border-[#1e2538]">
+            <span>
+              মোট চ্যাট:{' '}
+              <strong className="text-gray-200">{(metrics.allTimeConversations || 0).toLocaleString()}</strong> টি
+            </span>
+            <Link href="/dashboard/pages" className="text-emerald-400 hover:underline">
+              ম্যানেজ করুন
+            </Link>
+          </div>
         </div>
 
-        {/* Card 2: Messages Today */}
-        <div className="bg-[#12141c] border border-[#1f2433] rounded-2xl p-5 hover:border-cyan-500/30 transition-all">
+        {/* Card 4: Orders & Revenue */}
+        <div className="bg-gradient-to-b from-[#1f1912] to-[#12141c] border border-amber-500/30 rounded-2xl p-5 hover:border-amber-500/50 transition-all shadow-lg relative overflow-hidden">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-amber-500/10 rounded-full blur-xl pointer-events-none"></div>
           <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">আজকের মেসেজ</span>
-            <div className="w-9 h-9 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
-              <MessageSquare className="w-5 h-5" />
+            <span className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+              <ShoppingCart className="w-3.5 h-3.5" /> ক্যাপচার্ড অর্ডার
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-300 flex items-center justify-center border border-amber-500/30">
+              <ShoppingCart className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
             <h3 className="text-2xl sm:text-3xl font-extrabold text-white">
-              {loading ? '...' : stats?.metrics?.totalIncoming || 0}
+              {loading ? '...' : (metrics.totalOrders || 0).toLocaleString()}
             </h3>
-            <span className="text-xs text-cyan-400 font-medium">টি ইনকামিং</span>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-2">কাস্টমারদের থেকে প্রাপ্ত মোট মেসেজ</p>
-        </div>
-
-        {/* Card 3: AI Replies */}
-        <div className="bg-[#12141c] border border-[#1f2433] rounded-2xl p-5 hover:border-purple-500/30 transition-all">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">AI রিপ্লাই সংখ্যা</span>
-            <div className="w-9 h-9 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
-              <Bot className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-white">
-              {loading ? '...' : stats?.metrics?.totalAiReplies || 0}
-            </h3>
-            <span className="text-xs text-purple-400 font-medium">টি স্বয়ংক্রিয়</span>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-2">গড় রেসপন্স টাইম: ১.৮ সেকেন্ড</p>
-        </div>
-
-        {/* Card 4: Orders Captured */}
-        <div className="bg-[#12141c] border border-[#1f2433] rounded-2xl p-5 hover:border-amber-500/30 transition-all">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">ক্যাপচার্ড অর্ডার</span>
-            <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-              <ShoppingCart className="w-5 h-5" />
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-2xl sm:text-3xl font-extrabold text-white">
-              {loading ? '...' : stats?.metrics?.totalOrders || 0}
-            </h3>
-            <span className="text-xs text-amber-400 font-medium">
-              ({stats?.metrics?.totalRevenue || 0} ৳)
+            <span className="text-xs text-amber-300 font-medium">
+              ({(metrics.totalRevenue || 0).toLocaleString()} ৳)
             </span>
           </div>
-          <p className="text-[11px] text-gray-400 mt-2">কনভার্শন রেট: {stats?.metrics?.conversionRate || 0}%</p>
+          <div className="flex items-center justify-between text-[11px] text-gray-400 mt-2.5 pt-2 border-t border-[#1e2538]">
+            <span>কনভার্শন রেট: {metrics.conversionRate || 0}%</span>
+            <Link href="/dashboard/orders" className="text-amber-400 hover:underline">
+              অর্ডার দেখুন
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* Comprehensive Message Breakdown & Subscription Quota Box                  */}
+      {/* ========================================================================= */}
+      <div className="bg-[#12141c] border border-[#1f2433] rounded-2xl p-5 sm:p-6 mb-8 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5 pb-4 border-b border-[#1e2538]">
+          <div>
+            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+              <BarChart2 className="w-4 h-4 text-emerald-400" />
+              <span>মেসেজ ও অটোমেশন সম্পূর্ণ পরিসংখ্যান (All Message Metrics)</span>
+            </h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              ইনকামিং, আউটগোয়িং, AI অটো-রিপ্লাই এবং বর্তমান সাবস্ক্রিপশন কোটা ব্যবহার
+            </p>
+          </div>
+
+          <Link
+            href="/dashboard/conversations"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold transition-colors self-start sm:self-auto"
+          >
+            <MessageSquare className="w-3.5 h-3.5" />
+            <span>ইনবক্স ওপেন করুন</span>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+          {/* Metric 1: Total All-time Messages */}
+          <div className="p-4 rounded-xl bg-[#090a0f] border border-[#1e2538]">
+            <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-1">
+              সর্বমোট মেসেজ
+            </div>
+            <div className="text-xl sm:text-2xl font-extrabold text-white">
+              {(metrics.allTimeTotalMessages ?? 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1">ইনকামিং + আউটগোয়িং</div>
+          </div>
+
+          {/* Metric 2: Total Incoming */}
+          <div className="p-4 rounded-xl bg-[#090a0f] border border-[#1e2538]">
+            <div className="text-[11px] font-semibold text-cyan-400 uppercase tracking-wider mb-1">
+              গ্রাহক ইনকামিং
+            </div>
+            <div className="text-xl sm:text-2xl font-extrabold text-cyan-300">
+              {(metrics.allTimeIncoming ?? 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1">
+              {timeRange === 'today' ? 'আজকে' : 'সিলেক্টেড'}: +{(metrics.totalIncoming || 0).toLocaleString()}
+            </div>
+          </div>
+
+          {/* Metric 3: AI Auto Replies */}
+          <div className="p-4 rounded-xl bg-[#090a0f] border border-[#1e2538]">
+            <div className="text-[11px] font-semibold text-purple-400 uppercase tracking-wider mb-1">
+              AI অটো রিপ্লাই
+            </div>
+            <div className="text-xl sm:text-2xl font-extrabold text-purple-300">
+              {(metrics.allTimeAiReplies ?? 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1">
+              {timeRange === 'today' ? 'আজকে' : 'সিলেক্টেড'}: +{(metrics.totalAiReplies || 0).toLocaleString()}
+            </div>
+          </div>
+
+          {/* Metric 4: Total Conversations */}
+          <div className="p-4 rounded-xl bg-[#090a0f] border border-[#1e2538]">
+            <div className="text-[11px] font-semibold text-emerald-400 uppercase tracking-wider mb-1">
+              মোট কথোপকথন
+            </div>
+            <div className="text-xl sm:text-2xl font-extrabold text-emerald-300">
+              {(metrics.allTimeConversations ?? 0).toLocaleString()}
+            </div>
+            <div className="text-[10px] text-gray-500 mt-1">কাস্টমার চ্যাট থ্রেড</div>
+          </div>
+
+          {/* Metric 5: Monthly Plan Quota */}
+          <div className="p-4 rounded-xl bg-[#090a0f] border border-[#1e2538] col-span-2 sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-amber-400 uppercase tracking-wider mb-1">
+              <span>চলতি মাসের কোটা</span>
+              <span className="text-[10px] text-gray-400 lowercase font-normal">{metrics.packageName || 'সক্রিয়'}</span>
+            </div>
+            <div className="text-base sm:text-lg font-bold text-white">
+              {monthlyUsed.toLocaleString()} / {monthlyLimit > 0 ? monthlyLimit.toLocaleString() : '∞'}
+            </div>
+            {/* Progress bar */}
+            {monthlyLimit > 0 && (
+              <div className="w-full bg-[#1e2538] h-1.5 rounded-full overflow-hidden mt-2">
+                <div
+                  className={`h-full rounded-full ${
+                    usagePercent > 85 ? 'bg-red-500' : usagePercent > 60 ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}
+                  style={{ width: `${usagePercent}%` }}
+                ></div>
+              </div>
+            )}
+            <div className="text-[10px] text-gray-500 mt-1">
+              {monthlyLimit > 0 ? `${usagePercent}% ব্যবহৃত হয়েছে` : 'আনলিমিটেড মেসেজ'}
+            </div>
+          </div>
         </div>
       </div>
 
